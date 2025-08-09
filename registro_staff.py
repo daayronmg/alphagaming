@@ -1,147 +1,262 @@
-import streamlit as st
+"""Aplicación de gestión de staff para Pop Life.
+
+Esta versión incluye:
+    - Fichaje de entrada y salida.
+    - Registro de tickets y personas atendidas.
+    - Panel personal con estadísticas y gráficos.
+    - Ranking de productividad.
+    - Panel de fundador para añadir/eliminar miembros y descargar datos.
+
+La aplicación utiliza Google Sheets como base de datos.
+"""
+
+from datetime import date, datetime
+from io import BytesIO
+
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
 import pandas as pd
+import streamlit as st
+from oauth2client.service_account import ServiceAccountCredentials
 
-# ================================
-# CONFIG GOOGLE SHEETS
-# ================================
+# ========================================
+# CONFIGURACIÓN GOOGLE SHEETS
+# ========================================
 
-SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+SCOPE = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive",
+]
 
-# Cambia por el ID de tu hoja de cálculo de Google (el largo código en la URL de Sheets)
+# Cambia por el ID real de la hoja de cálculo
 SPREADSHEET_ID = "REGISTRO STAFF AG"
 
+
 @st.cache_resource
-def conectar_google():
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credenciales.json", SCOPE)
-    client = gspread.authorize(creds)
-    return client
+def conectar_google() -> gspread.client.Client:
+    """Autentica y devuelve un cliente de Google Sheets."""
+    creds = ServiceAccountCredentials.from_json_keyfile_name(
+        "credenciales.json", SCOPE
+    )
+    return gspread.authorize(creds)
+
 
 client = conectar_google()
 
-# Abrimos las hojas necesarias
-sheet_registro = client.open_by_key(SPREADSHEET_ID).worksheet("Registro")  # hoja donde guardas registros
-sheet_staff = client.open_by_key(SPREADSHEET_ID).worksheet("Staff")        # hoja donde guardas staff
+# Hojas usadas por la aplicación
+sheet_fichajes = client.open_by_key(SPREADSHEET_ID).worksheet("Fichajes")
+sheet_tickets = client.open_by_key(SPREADSHEET_ID).worksheet("Tickets")
+sheet_personas = client.open_by_key(SPREADSHEET_ID).worksheet("Personas")
+sheet_staff = client.open_by_key(SPREADSHEET_ID).worksheet("Staff")
 
-# ====================================
-# CARGAR LISTA DE STAFF DESDE HOJA
-# ====================================
+# Cargar lista de miembros
 datos_staff = sheet_staff.get_all_records()
 staff_nombres = [fila["Nombre"] for fila in datos_staff]
 rangos = [
-    "Soporte", "Moderador", "Moderador IG", "Administrador",
-    "Game Master", "Director de Staff", "Sub Director de Staff", "Admin Mafia"
+    "Soporte",
+    "Moderador",
+    "Moderador IG",
+    "Administrador",
+    "Game Master",
+    "Director de Staff",
+    "Sub Director de Staff",
+    "Admin Mafia",
 ]
 
-# ================================
-# CONTRASEÑA PANEL ADMIN
-# ================================
-PASSWORD_ADMIN = "DSALPHA"  # Cambia la contraseña aquí
+# Fundadores con acceso total
+FUNDADORES = {"Lama", "Vitro", "Kevin"}
 
-# ================================
-# INTERFAZ STREAMLIT
-# ================================
 
-st.title("🛡️ Registro Staff AlphaGaming")
+@st.cache_data
+def cargar_datos():
+    """Obtiene los registros completos de las hojas de cálculo."""
+    fichajes = pd.DataFrame(sheet_fichajes.get_all_records())
+    tickets = pd.DataFrame(sheet_tickets.get_all_records())
+    personas = pd.DataFrame(sheet_personas.get_all_records())
+    return fichajes, tickets, personas
 
-nombre = st.selectbox("🧍 Selecciona tu nombre", staff_nombres)
-# Obtener el rango automáticamente según el nombre seleccionado
-def obtener_rango(nombre_sel):
+
+def obtener_rango(nombre_sel: str) -> str:
+    """Devuelve el rango asociado a un nombre."""
     for fila in datos_staff:
         if fila["Nombre"] == nombre_sel:
             return fila["Rango"]
     return "No asignado"
 
-rango = obtener_rango(nombre)
 
+# ========================================
+# INTERFAZ PRINCIPAL
+# ========================================
+
+st.set_page_config(page_title="Pop Life Staff", layout="wide")
+st.title("🛡️ Registro Staff Pop Life")
+
+nombre = st.selectbox("🧍 Selecciona tu nombre", staff_nombres)
+rango = obtener_rango(nombre)
 st.markdown(f"Tu rango es: **{rango}**")
+
+# ----------------------------------------
+# FICHAR ENTRADA / SALIDA
+# ----------------------------------------
 
 col1, col2 = st.columns(2)
 
-if col1.button("🟢 Entrar en servicio"):
-    entrada = datetime.now()
-    st.session_state["entrada"] = entrada
-    st.success(f"Has entrado en servicio a las {entrada.strftime('%H:%M:%S')}")
+if col1.button("🟢 Fichar entrada"):
+    st.session_state["entrada"] = datetime.now()
+    st.success(
+        f"Entrada registrada a las {st.session_state['entrada'].strftime('%H:%M:%S')}"
+    )
 
-if col2.button("🔴 Salir de servicio"):
+if col2.button("🔴 Fichar salida"):
     if "entrada" not in st.session_state:
-        st.error("⚠️ Primero debes entrar en servicio.")
+        st.error("⚠️ Primero debes fichar la entrada.")
     else:
-        personas_atendidas = st.number_input("Número de personas atendidas", min_value=0, step=1, key="personas_atendidas")
-        motivo = st.text_area("Motivo de la atención", key="motivo")
-        solucion = st.text_area("Solución dada", key="solucion")
-
         salida = datetime.now()
-        entrada = st.session_state["entrada"]
+        entrada = st.session_state.pop("entrada")
         duracion = salida - entrada
-        minutos = round(duracion.total_seconds() / 60)
+        minutos = round(duracion.total_seconds() / 60, 2)
+        sheet_fichajes.append_row(
+            [
+                nombre,
+                rango,
+                entrada.strftime("%Y-%m-%d"),
+                entrada.strftime("%H:%M:%S"),
+                salida.strftime("%H:%M:%S"),
+                minutos,
+            ]
+        )
+        st.success(f"Servicio registrado: {minutos} min")
 
-        fecha = entrada.strftime("%Y-%m-%d")
-        hora_entrada = entrada.strftime("%H:%M:%S")
-        hora_salida = salida.strftime("%H:%M:%S")
 
-        # Guardar en Google Sheets
-        sheet_registro.append_row([
-            nombre,
-            rango,
-            fecha,
-            hora_entrada,
-            hora_salida,
-            f"{minutos} min",
-            personas_atendidas,
-            motivo,
-            solucion
-        ])
+# ----------------------------------------
+# FORMULARIOS DE REGISTRO ADICIONAL
+# ----------------------------------------
 
-        st.success(f"✅ Servicio registrado: {minutos} minutos.")
-        del st.session_state["entrada"]
+with st.expander("➕ Añadir ticket"):
+    t_numero = st.text_input("Número de ticket")
+    t_motivo = st.text_area("Motivo")
+    t_fecha = st.date_input("Fecha", value=date.today())
+    if st.button("Guardar ticket"):
+        if t_numero:
+            sheet_tickets.append_row(
+                [t_numero, t_motivo, t_fecha.strftime("%Y-%m-%d"), nombre]
+            )
+            st.success("Ticket guardado")
+        else:
+            st.warning("Debes ingresar un número de ticket")
 
-# ================================
-# PANEL ADMINISTRATIVO
-# ================================
+with st.expander("➕ Añadir persona atendida"):
+    p_motivo = st.text_area("Motivo", key="motivo_persona")
+    p_fecha = st.date_input("Fecha", value=date.today(), key="fecha_persona")
+    if st.button("Guardar persona"):
+        sheet_personas.append_row([p_motivo, p_fecha.strftime("%Y-%m-%d"), nombre])
+        st.success("Registro guardado")
+
+
+# ----------------------------------------
+# PANEL PERSONAL
+# ----------------------------------------
 
 st.markdown("---")
-st.subheader("📊 Panel de Control (Solo Admin)")
+st.subheader("📈 Tus estadísticas")
 
-clave = st.text_input("Introduce contraseña para ver el panel admin", type="password")
+fichajes_df, tickets_df, personas_df = cargar_datos()
 
-if clave == PASSWORD_ADMIN:
-    # Mostrar registros de servicio
-    registros = sheet_registro.get_all_records()
-    df = pd.DataFrame(registros)
+fichajes_user = (
+    fichajes_df[fichajes_df["Nombre"] == nombre] if not fichajes_df.empty else pd.DataFrame()
+)
+tickets_user = (
+    tickets_df[tickets_df["Miembro"] == nombre] if not tickets_df.empty else pd.DataFrame()
+)
+personas_user = (
+    personas_df[personas_df["Miembro"] == nombre]
+    if not personas_df.empty
+    else pd.DataFrame()
+)
 
-    if not df.empty:
-        filtro_nombre = st.selectbox("Filtrar registros por nombre", ["Todos"] + staff_nombres, key="filtro_nombre")
-        if filtro_nombre != "Todos":
-            df = df[df["Nombre"] == filtro_nombre]
+total_minutos = (
+    fichajes_user["Minutos"].astype(float).sum() if not fichajes_user.empty else 0
+)
+total_tickets = len(tickets_user)
+total_personas = len(personas_user)
 
-        st.dataframe(df)
+m1, m2, m3 = st.columns(3)
+m1.metric("Horas fichadas", round(total_minutos / 60, 2))
+m2.metric("Tickets", total_tickets)
+m3.metric("Personas atendidas", total_personas)
 
-        resumen = df.groupby("Nombre")["Duración"].count().reset_index(name="Servicios Realizados")
-        st.markdown("#### Servicios por Persona")
-        st.dataframe(resumen)
-    else:
-        st.info("Aún no hay registros.")
+if not fichajes_user.empty:
+    fichajes_user["Fecha"] = pd.to_datetime(fichajes_user["Fecha"])
+    st.bar_chart(fichajes_user.groupby("Fecha")["Minutos"].sum())
 
-    # Añadir nuevo staff
-    st.markdown("### ➕ Añadir nuevo miembro del staff")
 
-    nuevo_nombre = st.text_input("Nombre del nuevo staff", key="nuevo_nombre")
-    nuevo_rango = st.selectbox("Selecciona su rango", rangos, key="nuevo_rango")
+# ----------------------------------------
+# RANKING DE PRODUCTIVIDAD
+# ----------------------------------------
 
-    if st.button("Añadir al staff", key="boton_añadir"):
-        if nuevo_nombre and nuevo_rango:
-            # Verificar si ya existe
+st.markdown("---")
+st.subheader("🏆 Ranking de productividad")
+
+horas = (
+    fichajes_df.groupby("Nombre")["Minutos"].sum() / 60
+    if not fichajes_df.empty
+    else pd.Series(dtype=float)
+)
+tickets_count = (
+    tickets_df.groupby("Miembro").size() if not tickets_df.empty else pd.Series(dtype=int)
+)
+personas_count = (
+    personas_df.groupby("Miembro").size() if not personas_df.empty else pd.Series(dtype=int)
+)
+
+ranking_df = pd.DataFrame({"Horas": horas, "Tickets": tickets_count, "Personas": personas_count}).fillna(0)
+ranking_df["Puntos"] = ranking_df["Horas"] + ranking_df["Tickets"] + ranking_df["Personas"]
+ranking_df = ranking_df.sort_values("Puntos", ascending=False)
+st.dataframe(ranking_df)
+
+
+# ----------------------------------------
+# PANEL DEL FUNDADOR
+# ----------------------------------------
+
+if nombre in FUNDADORES:
+    st.markdown("---")
+    st.subheader("⚙️ Panel del fundador")
+
+    nuevo_nombre = st.text_input("Nombre del nuevo staff")
+    nuevo_rango = st.selectbox("Rango", rangos, key="rango_nuevo")
+    if st.button("Añadir staff"):
+        if nuevo_nombre:
             if nuevo_nombre in staff_nombres:
-                st.warning(f"⚠️ {nuevo_nombre} ya está en la lista de staff.")
+                st.warning("El miembro ya existe")
             else:
                 sheet_staff.append_row([nuevo_nombre, nuevo_rango])
-                st.success(f"✅ {nuevo_nombre} añadido como {nuevo_rango}.")
-                # Actualizar lista localmente
                 staff_nombres.append(nuevo_nombre)
+                st.success("Miembro añadido")
         else:
-            st.warning("⚠️ Debes ingresar un nombre y seleccionar un rango.")
-else:
-    st.info("Introduce la contraseña para acceder al panel de administración.")
+            st.warning("Introduce un nombre")
+
+    eliminar = st.selectbox("Eliminar miembro", [""] + staff_nombres)
+    if st.button("Eliminar staff") and eliminar:
+        try:
+            cell = sheet_staff.find(eliminar)
+            sheet_staff.delete_rows(cell.row)
+            staff_nombres.remove(eliminar)
+            st.success("Miembro eliminado")
+        except gspread.exceptions.CellNotFound:
+            st.warning("Miembro no encontrado")
+
+    # Descargar datos
+    fichajes_df, tickets_df, personas_df = cargar_datos()
+    st.markdown("### Descargar datos")
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        fichajes_df.to_excel(writer, sheet_name="Fichajes", index=False)
+        tickets_df.to_excel(writer, sheet_name="Tickets", index=False)
+        personas_df.to_excel(writer, sheet_name="Personas", index=False)
+    st.download_button(
+        "Descargar Excel",
+        data=output.getvalue(),
+        file_name="poplife_datos.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
