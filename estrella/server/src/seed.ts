@@ -1,5 +1,4 @@
 /**
-process.env.TZ ||= 'Europe/Madrid';
  * Datos de DEMOSTRACIÓN claramente identificados (is_demo = true, correos @estrella.demo).
  * Uso:  npm run seed            → solo si la base de datos está vacía
  *       npm run seed -- --reset → borra TODO y vuelve a sembrar (¡solo en desarrollo!)
@@ -15,6 +14,7 @@ import { COURSES } from './academyContent.ts';
 import { uid, type ScoreDoc, type Note, type Measure, type Step, type Dur } from '../../shared/music.ts';
 import { config } from './config.ts';
 
+process.env.TZ ||= 'Europe/Madrid';
 export const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'Estrella2026demo';
 
 function n(spec: string): Note {
