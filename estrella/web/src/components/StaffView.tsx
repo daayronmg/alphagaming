@@ -156,7 +156,7 @@ export default function StaffView(p: Props) {
       {p.loop && hl((r) => r.n >= p.loop!.from && r.n <= p.loop!.to, { background: 'rgba(168,85,247,.08)', border: '2px dashed #a855f7' }, 'loop')}
       {p.selectedMeasureId && hl((r) => r.id === p.selectedMeasureId, { border: '2px solid #c9a227', background: 'rgba(201,162,39,.08)' }, 'sel')}
       {p.currentMeasure != null && hl((r) => r.n === p.currentMeasure, { border: '3px solid #c9a227', background: 'rgba(201,162,39,.14)', borderColor: '#c9a227' }, 'cur', (r) => `Compás ${r.n}`)}
-      {hl((r) => !!(r as any).bad, { borderBottom: '3px solid #ef4444' }, 'bad')}
+      {!p.compact && hl((r) => !!(r as any).bad, { borderBottom: '3px solid #ef4444' }, 'bad')}
     </div>
   );
 }

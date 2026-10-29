@@ -95,7 +95,7 @@ export async function seedAcademy(authorId: string | null) {
   }
 }
 
-async function seedDemo() {
+export async function seedDemo() {
   await ensureStructure();
   const I = await ids();
   await q(`insert into settings(key, value) values ('branding', $1) on conflict (key) do nothing`, [JSON.stringify({
@@ -221,4 +221,6 @@ async function main() {
   console.log(`  Marcha demo:    ${r.marchaId}`);
 }
 
-main().then(() => pool.end()).catch((e) => { console.error(e); process.exit(1); });
+if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()!)) {
+  main().then(() => pool.end()).catch((e) => { console.error(e); process.exit(1); });
+}

@@ -1,0 +1,176 @@
+// Pruebas de la API contra una base de datos de pruebas (estrella_test).
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs';
+
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgres://estrella:estrella_dev@localhost:5432/estrella_test';
+process.env.STORAGE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'estrella-test-'));
+
+const { pool } = await import('../src/db.ts');
+const { migrate } = await import('../src/migrate.ts');
+const { seedDemo, DEMO_PASSWORD } = await import('../src/seed.ts');
+const { createApp } = await import('../src/app.ts');
+
+let base = '';
+let server: any;
+before(async () => {
+  await pool.query('drop schema public cascade; create schema public;');
+  await migrate(false);
+  await seedDemo();
+  server = createApp().listen(0);
+  base = `http://127.0.0.1:${server.address().port}/api`;
+});
+after(async () => { server.close(); await pool.end(); });
+
+async function login(email: string) {
+  const r = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ email, password: DEMO_PASSWORD }) });
+  assert.equal(r.status, 200);
+  const cookie = r.headers.get('set-cookie')!.split(';')[0];
+  return async (p: string, method = 'GET', body?: unknown) => {
+    const res = await fetch(`${base}${p}`, { method, headers: { cookie, 'x-estrella': '1', ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    return { status: res.status, data: res.headers.get('content-type')?.includes('json') ? await res.json() : await res.text() };
+  };
+}
+
+test('sin sesión no hay acceso; sin cabecera anti-CSRF no hay mutaciones', async () => {
+  assert.equal((await fetch(`${base}/library/marchas`)).status, 401);
+  const r = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  assert.equal(r.status, 403);
+});
+
+test('asignación automática: cada componente recibe su parte y nunca otra voz', async () => {
+  const a = await login('componente.a@estrella.demo');
+  const b = await login('componente.b@estrella.demo');
+  const f = await login('componente.f@estrella.demo'); // corneta 2ª: no hay parte
+  const m = (await a('/library/marchas?q=demostraci')).data.find((x: any) => x.title.includes('(ESTRELLA)'));
+  const ra = (await a(`/library/marchas/${m.id}/my-part`)).data;
+  const rb = (await b(`/library/marchas/${m.id}/my-part`)).data;
+  const rf = (await f(`/library/marchas/${m.id}/my-part`)).data;
+  assert.equal(ra.part.label, 'Corneta 3ª voz');
+  assert.equal(rb.part.label, 'Trompeta');
+  assert.equal(rf.status, 'falta_parte');
+  assert.equal(rf.part, null);
+  assert.match(rf.message, /2ª voz/);
+});
+
+test('cambio de asignación registrado y aplicado; un componente no puede hacerlo', async () => {
+  const e = await login('emilio@estrella.demo');
+  const a = await login('componente.a@estrella.demo');
+  const members = (await e('/members')).data;
+  const f = members.find((x: any) => x.name.startsWith('Componente F'));
+  const struct = (await e('/org/structure')).data;
+  const corneta = struct.find((s: any) => s.name === 'Cornetas').instruments[0];
+  const v3 = corneta.voices.find((v: any) => v.name === '3ª voz');
+  assert.equal((await a(`/members/${f.id}/assignments`, 'POST', { assignments: [{ instrument_id: corneta.id, voice_id: v3.id }] })).status, 403);
+  const pend = await e(`/members/${f.id}/assignments`, 'POST', { assignments: [{ instrument_id: corneta.id, voice_id: v3.id }], apply: 'confirmar', reason: 'prueba' });
+  assert.equal(pend.status, 200);
+  let detail = (await e(`/members/${f.id}`)).data;
+  assert.equal(detail.assignments[0].voice, '2ª voz'); // aún no aplicado
+  await e(`/members/assignment-changes/${pend.data.change_id}/apply`, 'POST', {});
+  detail = (await e(`/members/${f.id}`)).data;
+  assert.equal(detail.assignments[0].voice, '3ª voz');
+  assert.ok(detail.assignment_changes.some((c: any) => c.status === 'aplicado' && c.reason === 'prueba'));
+});
+
+test('importación CSV: previsualización, rechazo de rol de dirección e invitaciones', async () => {
+  const e = await login('emilio@estrella.demo');
+  const csv = 'nombre;correo;seccion;instrumento;voz;rol\nNueva Persona;nueva@example.com;Cornetas;Corneta;1ª voz;componente\nIntruso;intruso@example.com;Cornetas;Corneta;1ª voz;director\n';
+  const send = async (modo: string) => {
+    const fd = new FormData();
+    fd.append('file', new Blob([csv], { type: 'text/csv' }), 'c.csv'); fd.append('modo', modo);
+    const login2 = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ email: 'emilio@estrella.demo', password: DEMO_PASSWORD }) });
+    const cookie = login2.headers.get('set-cookie')!.split(';')[0];
+    const r = await fetch(`${base}/members/import`, { method: 'POST', headers: { cookie, 'x-estrella': '1' }, body: fd });
+    return { status: r.status, data: await r.json() };
+  };
+  const prev = await send('previsualizar');
+  assert.equal(prev.status, 200);
+  assert.equal(prev.data.summary.errores, 1);
+  assert.match(prev.data.rows[1].errors.join(), /dirección/);
+  assert.equal((await send('importar')).status, 400); // no se importa con errores
+  void e;
+});
+
+test('anotaciones: capa oficial protegida, privacidad y control de versiones', async () => {
+  const e = await login('emilio@estrella.demo');
+  const a = await login('componente.a@estrella.demo');
+  const b = await login('componente.b@estrella.demo');
+  const m = (await e('/library/marchas?q=demostraci')).data.find((x: any) => x.title.includes('(ESTRELLA)'));
+  const part = (await e(`/library/marchas/${m.id}`)).data.parts.find((p: any) => p.label === 'Corneta 3ª voz');
+  const ann = (layer: string) => ({ id: crypto.randomUUID(), marcha_id: m.id, part_id: part.id, page: 1, layer, kind: 'rect', data: { x: .1, y: .1, w: .2, h: .1 }, color: '#dc2626' });
+  assert.equal((await a('/annotations', 'POST', ann('official'))).status, 403);
+  const off = await e('/annotations', 'POST', ann('official'));
+  assert.equal(off.status, 200);
+  const priv = await a('/annotations', 'POST', ann('personal'));
+  const listB = (await b(`/annotations?marcha=${m.id}&part=${part.id}`)).data.annotations;
+  assert.ok(listB.some((x: any) => x.id === off.data.id));
+  assert.ok(!listB.some((x: any) => x.id === priv.data.id));
+  // conflicto: dos ediciones con la misma versión
+  const u1 = await e(`/annotations/${off.data.id}`, 'PUT', { version: 1, color: '#2563eb' });
+  assert.equal(u1.status, 200);
+  const u2 = await e(`/annotations/${off.data.id}`, 'PUT', { version: 1, color: '#16a34a' });
+  assert.equal(u2.status, 409);
+  assert.equal(u2.data.current.color, '#2563eb');
+});
+
+test('partituras editables: solo la dirección publica y cada versión queda registrada', async () => {
+  const e = await login('emilio@estrella.demo');
+  const a = await login('componente.a@estrella.demo');
+  const m = (await e('/library/marchas?q=demostraci')).data.find((x: any) => x.title.includes('(ESTRELLA)'));
+  const sc = (await e(`/library/marchas/${m.id}`)).data.scores[0];
+  const full = (await e(`/scores/${sc.id}`)).data;
+  const doc = structuredClone(full.draft);
+  doc.measures[0].notes[0].step = doc.measures[0].notes[0].step === 'A' ? 'B' : 'A';
+  assert.equal((await a(`/scores/${sc.id}/draft`, 'PUT', { content: doc, rev: full.draft_rev })).status, 403);
+  const d1 = await e(`/scores/${sc.id}/draft`, 'PUT', { content: doc, rev: full.draft_rev });
+  assert.equal(d1.status, 200);
+  assert.equal((await e(`/scores/${sc.id}/draft`, 'PUT', { content: doc, rev: full.draft_rev })).status, 409); // no se sobrescribe en silencio
+  const pub = await e(`/scores/${sc.id}/publish`, 'POST', { description: 'Corrección de prueba' });
+  assert.equal(pub.status, 200);
+  assert.equal(pub.data.number, 2);
+  assert.equal(pub.data.changes[0].measure, 1);
+  const seen = (await a(`/scores/${sc.id}`)).data;
+  assert.equal(seen.version_number, 2);
+  assert.equal(seen.draft, undefined); // los músicos no ven borradores
+  const rest = await e(`/scores/${sc.id}/restore`, 'POST', { version_id: seen.versions[1].id });
+  assert.equal(rest.data.number, 3);
+});
+
+test('asistencia: el registro oficial solo lo modifica la dirección o responsables de su sección', async () => {
+  const e = await login('emilio@estrella.demo');
+  const c = await login('componente.c@estrella.demo'); // responsable de cornetas
+  const ev = (await e('/events')).data.find((x: any) => x.title === 'Ensayo (demo)');
+  const roster = (await e(`/events/${ev.id}`)).data.roster;
+  const a = roster.find((r: any) => r.name.startsWith('Componente A'));
+  const b = roster.find((r: any) => r.name.startsWith('Componente B'));
+  assert.equal((await c(`/events/${ev.id}/attendance`, 'PUT', [{ user_id: a.id, status: 'presente' }])).status, 200);
+  assert.equal((await c(`/events/${ev.id}/attendance`, 'PUT', [{ user_id: b.id, status: 'presente' }])).status, 403); // trompeta: otra sección
+  const log = (await e(`/events/${ev.id}/attendance/log`)).data;
+  assert.ok(log.some((l: any) => l.user_id === a.id && l.new_status === 'presente'));
+});
+
+test('sesión en directo: versión, orden de compás y recuperación del estado', async () => {
+  const e = await login('emilio@estrella.demo');
+  const b = await login('componente.b@estrella.demo');
+  const m = (await e('/library/marchas?q=demostraci')).data.find((x: any) => x.title.includes('(ESTRELLA)'));
+  const s = (await e('/live', 'POST', {})).data;
+  await e(`/live/${s.id}/cmd`, 'POST', { type: 'select_marcha', marchaId: m.id });
+  const r = (await e(`/live/${s.id}/cmd`, 'POST', { type: 'measure', measure: 12 })).data;
+  assert.equal(r.version, 3);
+  const st = (await b(`/live/${s.id}`)).data; // un dispositivo que se reconecta recupera todo
+  assert.equal(st.state.measure, 12);
+  assert.equal(st.state.marchaTitle, m.title);
+  const mine = (await b(`/live/${s.id}/my-part`)).data;
+  assert.equal(mine.part.label, 'Trompeta');
+  assert.equal((await b(`/live/${s.id}/cmd`, 'POST', { type: 'stop' })).status, 403);
+  await e(`/live/${s.id}/end`, 'POST', {});
+});
+
+test('archivos privados: validación por contenido y acceso restringido', async () => {
+  const { sniff } = await import('../src/lib/files.ts');
+  assert.equal(sniff(Buffer.from('%PDF-1.4 ...'))?.kind, 'pdf');
+  assert.equal(sniff(Buffer.from('<html>hola</html>')), null);
+  assert.equal(sniff(Buffer.from('MZ\x90\x00')), null); // ejecutable: rechazado
+});

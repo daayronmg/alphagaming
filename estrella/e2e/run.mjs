@@ -279,6 +279,36 @@ await test('Registro de asistencia y resumen del ensayo quedan guardados', async
   assert(attA?.status === 'presente', 'A no ve su asistencia');
 });
 
+if (process.env.OFFLINE !== '0') {
+  await test('Sin conexión: la partitura descargada sigue disponible y la nota personal se envía al reconectar', async () => {
+    const P = await session('componente.a@estrella.demo', { width: 412, height: 900 }, 'A sin conexión');
+    await P.page.goto(`${BASE}/partitura/${partC3.id}`);
+    await P.page.locator('.score-page canvas').first().waitFor();
+    await P.page.waitForFunction(() => navigator.serviceWorker?.controller || navigator.serviceWorker?.ready, null, { timeout: 15000 });
+    await P.page.reload(); // ya controlada por el service worker
+    await P.page.locator('.score-page canvas').first().waitFor();
+    await P.page.waitForTimeout(1500);
+    await P.ctx.setOffline(true);
+    await P.page.reload();
+    await P.page.locator('.score-page canvas').first().waitFor({ timeout: 15000 });
+    // nota personal sin conexión → queda en cola
+    await P.page.click('[data-testid=open-tools]').catch(() => {});
+    await P.page.locator('[data-tool=pen]').click();
+    const sv = await P.page.locator('.score-page svg.layer').first().boundingBox();
+    const sc = await P.page.locator('.score-scroll').boundingBox();
+    const x0 = Math.max(sc.x, sv.x) + 40, y0 = Math.max(sc.y, sv.y) + 80;
+    await P.page.mouse.move(x0, y0); await P.page.mouse.down();
+    for (let i = 1; i <= 8; i++) await P.page.mouse.move(x0 + i * 10, y0 + (i % 2) * 5);
+    await P.page.mouse.up();
+    await P.page.locator('.badge', { hasText: 'pendiente' }).first().waitFor({ timeout: 8000 });
+    await P.ctx.setOffline(false);
+    await P.page.waitForFunction(() => !document.body.innerText.includes('pendiente'), null, { timeout: 25000 });
+    const mine = (await P.api(`/annotations?marcha=${marcha.id}&part=${partC3.id}`)).data.annotations.filter((a) => a.layer === 'personal' && a.kind === 'pen');
+    assert(mine.length >= 1, 'la nota creada sin conexión no ha llegado al servidor');
+    await P.ctx.close();
+  });
+}
+
 console.log('\n' + results.join('\n'));
 if (errors.length) console.log('\nErrores de página:\n' + [...new Set(errors)].slice(0, 15).join('\n'));
 fs.writeFileSync(`${OUT}/resultados.txt`, results.join('\n') + (errors.length ? '\n\nErrores de página:\n' + [...new Set(errors)].join('\n') : '') + '\n');

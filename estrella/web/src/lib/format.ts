@@ -1,6 +1,6 @@
 const tz = undefined; // zona horaria del dispositivo
 export const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz });
-export const fmtDateLong = (d: string | Date) => new Date(d).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: tz });
+export const fmtDateLong = (d: string | Date) => { const s = new Date(d).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: tz }); return s[0].toUpperCase() + s.slice(1); };
 export const fmtTime = (d: string | Date) => new Date(d).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: tz });
 export const fmtDateTime = (d: string | Date) => `${fmtDate(d)} · ${fmtTime(d)}`;
 export function fmtRelative(d: string | Date) {
