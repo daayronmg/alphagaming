@@ -6,7 +6,7 @@ import { useAuth } from '../lib/auth';
 import { useLoad, Spinner, ErrorBox, Notice, useToast } from '../components/ui';
 import StaffView from '../components/StaffView';
 import AudioPlayer from '../components/AudioPlayer';
-import { playScores, type ScorePlayback } from '../lib/audio';
+import { playScores, unlockAudio, type ScorePlayback } from '../lib/audio';
 import { transcribePdf } from '../lib/pdf';
 import { useRealtime } from '../lib/realtime';
 import type { ScoreDoc } from '../../../shared/music';
@@ -49,6 +49,7 @@ export default function PlayMarcha() {
   const play = () => {
     if (!doc) return;
     if (playing) return stop();
+    unlockAudio();
     const ns = doc.measures.map((mm) => mm.n);
     pb.current = playScores([{ doc, gain: 1 }], {
       from: Math.min(...ns), to: Math.max(...ns), tempo: Math.round((doc.tempo * speed) / 100), metronome: metro,
@@ -91,6 +92,7 @@ export default function PlayMarcha() {
           <button className={`btn lg play-big ${playing ? '' : 'primary'}`} onClick={play} data-testid="play-march">
             {playing ? <><Square size={24} /> Parar</> : <><Play size={26} /> Reproducir mi parte</>}
           </button>
+          <p className="xs faint" style={{ textAlign: 'center', marginTop: -4 }}>¿No se oye? Sube el volumen del móvil y, en iPhone, quita el modo silencio.</p>
           <div className="row speed-row nowrap">
             <Gauge size={18} className="faint" />
             <input type="range" min={50} max={120} step={5} value={speed} onChange={(e) => { setSpeed(Number(e.target.value)); if (playing) stop(); }} aria-label="Velocidad" />
