@@ -1,3 +1,4 @@
+import { pool } from './db.ts';
 import compression from 'compression';
 import { precompress, servePrecompressed } from './lib/precompress.ts';
 import express from 'express';
@@ -36,7 +37,18 @@ export function createApp() {
   app.use(express.json({ limit: '4mb' }));
   app.use(cookieParser());
   app.use('/api', authMiddleware, csrfGuard);
-  app.get('/api/health', (_req, res) => res.json({ ok: true, app: config.appName, time: Date.now() }));
+  // ?db=1 también consulta la base de datos: un vigilante externo que la llame cada pocos minutos mantiene
+  // despiertos el servidor y Supabase (el plan gratuito se pausa tras una semana sin uso) y avisa si falla
+  app.get('/api/health', async (req, res) => {
+    if (req.query.db !== '1') return res.json({ ok: true, app: config.appName, time: Date.now() });
+    const t0 = Date.now();
+    try {
+      await Promise.race([pool.query('select 1'), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))]);
+      res.json({ ok: true, db: 'ok', dbMs: Date.now() - t0, time: Date.now() });
+    } catch (e) {
+      res.status(503).json({ ok: false, db: 'error', error: (e as Error).message });
+    }
+  });
   // respuestas JSON de la API comprimidas (los PDF y audios ya van comprimidos o se cachean en el móvil)
   app.use('/api', compression({ threshold: 1024, level: 6, filter: (req, res) => !req.path.startsWith('/files') && compression.filter(req, res) }));
   app.use('/api/auth', authRouter);
