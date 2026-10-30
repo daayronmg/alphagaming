@@ -14,6 +14,8 @@ export interface Highlight extends Box { label?: string; variant: 'current' | 'l
 export interface InkStroke { page: number; points: [number, number][]; color: string; width: number }
 
 interface Props {
+  /** tramo de páginas [desde, hasta] cuando la parte es una sección de un libreto */
+  range?: [number, number] | null;
   url: string; kind: 'pdf' | 'image'; zoom: number;
   tool: Tool; color: string; width: number; symbol: string;
   annotations: Ann[]; measureMap: MeasureBox[]; highlights: Highlight[];
@@ -233,8 +235,12 @@ export default function ScoreCanvas(props: Props) {
 
   useEffect(() => {
     setPages(null); setErr('');
-    loadPages(props.url, props.kind).then((p) => { setPages(p); props.onPages?.(p.length); }).catch((e) => setErr(e?.message || 'No se pudo abrir la partitura'));
-  }, [props.url, props.kind]); // eslint-disable-line
+    loadPages(props.url, props.kind).then((all) => {
+      // parte de un libreto: solo sus páginas (la numeración pasa a ser la de la parte)
+      const p = props.range ? all.slice(props.range[0] - 1, props.range[1]) : all;
+      setPages(p); props.onPages?.(p.length);
+    }).catch((e) => setErr(e?.message || 'No se pudo abrir la partitura'));
+  }, [props.url, props.kind, props.range?.[0], props.range?.[1]]); // eslint-disable-line
 
   useLayoutEffect(() => {
     const el = wrap.current?.parentElement;

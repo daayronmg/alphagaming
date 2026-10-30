@@ -1,5 +1,5 @@
 // Audio: síntesis de partituras estructuradas, metrónomo preciso y detección de afinación.
-import { midiOf, midiToFreq, noteQuarters, type ScoreDoc } from '../../../shared/music';
+import { midiOf, midiToFreq, noteQuarters, playOrder, type ScoreDoc } from '../../../shared/music';
 
 let ctx: AudioContext | null = null;
 export function audioCtx(): AudioContext {
@@ -82,17 +82,25 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
   let lenSec = 0;
   for (const p of parts) {
     let t = 0;
-    for (const m of p.doc.measures.filter((m) => m.n >= opts.from && m.n <= opts.to)) {
+    let tied: Ev | null = null;
+    // con la obra entera se respetan las repeticiones; con un fragmento se toca tal cual
+    const range = p.doc.measures.filter((m) => m.n >= opts.from && m.n <= opts.to);
+    const seq = range.length === p.doc.measures.length ? playOrder(range) : range;
+    for (const m of seq) {
       if (p === parts[0]) measureStarts.push({ n: m.n, t });
       const cap = (p.doc.time[0] * 4) / p.doc.time[1];
       let mt = 0;
       for (const n of m.notes) {
         const q = noteQuarters(n);
         const midi = n.rest || !n.step ? null : midiOf(n.step, n.octave!, n.alter ?? 0) + p.doc.transposition;
-        evs.push({ t: t + mt * secPerQuarter, dur: q * secPerQuarter, midi, perc: !!p.perc || p.doc.clef === 'percussion', gain: p.gain, id: n.id });
+        // nota ligada a la anterior de la misma altura: se prolonga, no se vuelve a atacar
+        if (tied && midi != null && tied.midi === midi) tied.dur += q * secPerQuarter;
+        else evs.push(tied = { t: t + mt * secPerQuarter, dur: q * secPerQuarter, midi, perc: !!p.perc || p.doc.clef === 'percussion', gain: p.gain, id: n.id });
+        if (!n.tie || midi == null) tied = null;
         mt += q;
       }
-      t += Math.max(cap, mt) * secPerQuarter;
+      // compases incompletos (anacrusa, cambios de compás) duran lo que suman sus figuras
+      t += (mt > 0 ? mt : cap) * secPerQuarter;
     }
     lenSec = Math.max(lenSec, t);
   }

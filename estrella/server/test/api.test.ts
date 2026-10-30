@@ -192,6 +192,7 @@ test('libreto: cada marcha se separa en su PDF y llega a la voz correcta', async
     fd.append('label', 'Corneta 3ª');
     fd.append('instrument_id', String(corneta.id));
     fd.append('voice_id', String(c3.id));
+    fd.append('page_count', '4');
     fd.append('entries', JSON.stringify(entries));
     const r = await fetch(`${base}/library/import-book`, { method: 'POST', headers: { cookie: await cookie(email), 'x-estrella': '1' }, body: fd });
     return { status: r.status, data: await r.json() };
@@ -207,9 +208,13 @@ test('libreto: cada marcha se separa en su PDF y llega a la voz correcta', async
   const ra = (await a(`/library/marchas/${dos}/my-part`)).data;
   assert.equal(ra.status, 'ok');
   assert.equal(ra.part.page_count, 2);
+  assert.deepEqual([ra.part.page_from, ra.part.page_to], [2, 3]);
   assert.equal((await b(`/library/marchas/${dos}/my-part`)).data.status, 'falta_parte');
+  // el libreto se guarda una vez, sin modificar, y todas sus marchas lo comparten
+  const uno = (await a(`/library/marchas/${r1.data.results[0].marcha_id}/my-part`)).data.part;
+  assert.equal(uno.file_id, ra.part.file_id);
   const file = await fetch(`${base}/files/${ra.part.file_id}`, { headers: { cookie: await cookie('componente.a@estrella.demo') } });
-  assert.equal((await PDFDocument.load(Buffer.from(await file.arrayBuffer()))).getPageCount(), 2);
+  assert.equal((await PDFDocument.load(Buffer.from(await file.arrayBuffer()))).getPageCount(), 4);
   // reimportar con otro formato de título: misma marcha, nueva versión de la parte
   const r2 = await send('emilio@estrella.demo', [{ title: 'marcha libreto dós', from: 4, to: 4 }]);
   assert.equal(r2.data.results[0].marcha_id, dos);
@@ -218,4 +223,34 @@ test('libreto: cada marcha se separa en su PDF y llega a la voz correcta', async
   assert.equal(again.version, 2);
   assert.equal(again.page_count, 1);
   assert.equal((await e(`/library/marchas/${r1.data.results[0].marcha_id}`)).data.composer, 'Autor Uno');
+});
+
+test('notas leídas del PDF: se publican para la voz, se marcan los compases dudosos y no pisan una partitura hecha a mano', async () => {
+  const e = await login('emilio@estrella.demo');
+  const a = await login('componente.a@estrella.demo'); // corneta 3ª
+  const m = (await e('/library/marchas?q=libreto dos')).data[0];
+  const pending = (await e('/scores/pdf/pending')).data;
+  const row = pending.find((r: any) => r.marcha_id === m.id);
+  assert.ok(row, 'la parte del libreto está pendiente de notas');
+  assert.equal(row.transposition, -2);
+  const content = { schema: 1, title: 'x', clef: 'treble', key: 3, time: [4, 4], tempo: 76, transposition: -2, measures: [
+    { id: 'm1', n: 1, notes: [{ id: 'n1', step: 'C', octave: 5, alter: 1, dur: 'h', dots: 1 }, { id: 'n2', rest: true, dur: 'q' }] },
+    { id: 'm2', n: 2, notes: [{ id: 'n3', step: 'D', octave: 5, dur: '8', triplet: true }, { id: 'n4', step: 'D', octave: 5, dur: '8', triplet: true }, { id: 'n5', step: 'D', octave: 5, dur: '8', triplet: true }] },
+  ] };
+  assert.equal((await a(`/scores/pdf/${row.part_id}`, 'POST', { content, review: [2] })).status, 403);
+  const r = await e(`/scores/pdf/${row.part_id}`, 'POST', { content, review: [2] });
+  assert.equal(r.status, 200);
+  const mine = (await a(`/library/marchas/${m.id}/my-part`)).data;
+  assert.equal(mine.score.id, r.data.score_id);
+  const sc = (await a(`/scores/${r.data.score_id}`)).data;
+  assert.equal(sc.source, 'pdf');
+  assert.deepEqual(sc.review_measures, [2]);
+  assert.equal(sc.published.title, m.title);
+  assert.ok(!(await e('/scores/pdf/pending')).data.some((x: any) => x.part_id === row.part_id));
+  // una partitura editable hecha por la dirección nunca se sustituye
+  const t = (await e('/library/marchas?q=libreto uno')).data[0];
+  const prow = (await e('/scores/pdf/pending')).data.find((x: any) => x.marcha_id === t.id);
+  const manual = await e('/scores', 'POST', { marcha_id: t.id, label: 'Corneta 3ª', instrument_id: prow.instrument_id, voice_id: prow.voice_id, source: 'manual', content });
+  assert.equal(manual.status, 200);
+  assert.equal((await e(`/scores/pdf/${prow.part_id}`, 'POST', { content, review: [] })).status, 409);
 });

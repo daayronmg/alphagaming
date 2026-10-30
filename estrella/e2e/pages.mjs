@@ -23,7 +23,7 @@ for (const [email, vp, tag] of [['emilio@estrella.demo', { width: 1280, height: 
   const course = (await api('/academy/courses'))[0];
   const lessons = (await api(`/academy/courses/${course.id}`)).lessons;
   const members = await api('/members');
-  const routes = ['/', '/calendario', `/eventos/${ev.id}`, '/biblioteca', `/marchas/${marcha.id}`, `/partitura/${det.parts[0].id}`, `/score/${det.scores[0].id}`,
+  const routes = ['/', '/calendario', `/eventos/${ev.id}`, '/biblioteca', '/biblioteca/importar', `/marchas/${marcha.id}`, `/tocar/${marcha.id}`, `/partitura/${det.parts[0].id}`, `/score/${det.scores[0].id}`,
     '/directo', '/dudas', '/avisos', '/academia', `/academia/curso/${course.id}`, `/academia/leccion/${lessons[3].id}`, '/academia/entrenamiento', '/academia/herramientas',
     '/asistente', '/componentes', `/componentes/${members[0].id}`, '/componentes/importar', '/estadisticas', '/inventario', '/admin', '/ajustes', '/direccion'];
   for (const r of routes) {

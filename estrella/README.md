@@ -115,7 +115,7 @@ Las partituras de la «Marcha de demostración» son PDF generados automáticame
    ```
 3. En **Administración → Estructura**, configura las secciones, instrumentos y voces reales de la banda.
 4. En **Componentes → Importar CSV / Excel**, carga la lista de componentes (descarga la plantilla). Verás una vista previa antes de confirmar. Cada persona recibe su enlace de activación.
-5. En **Biblioteca**, crea las marchas y sube cada parte indicando instrumento y voz. Si tienes un libreto (un PDF con muchas marchas de una misma voz), usa **Biblioteca → Importar libreto**: ESTRELLA propone título y autor de cada página, lo revisas y se crea cada marcha con su parte (las que ya existen reciben la parte o una nueva versión). En **Compases**, vincula el mapa de compases de cada parte para el salto automático.
+5. En **Biblioteca**, crea las marchas y sube cada parte indicando instrumento y voz. Si tienes un libreto (un PDF con muchas marchas de una misma voz), usa **Marchas → Importar libreto**: ESTRELLA propone título y autor de cada página, lo revisas y se crea cada marcha con su parte (las que ya existen reciben la parte o una nueva versión). El PDF se guarda una sola vez y sin modificar; cada marcha apunta a sus páginas. Después pulsa **Sacar las notas**: si el PDF viene de Sibelius (vectorial, no escaneado), ESTRELLA lee las notas para que cada músico pueda pulsar **Reproducir** y ver el nombre de cada nota. Los compases que no cuadran quedan marcados para revisar; las partituras editables hechas a mano nunca se sustituyen. En **Compases**, vincula el mapa de compases de cada parte para el salto automático.
 
 ## 4. Despliegue
 
@@ -208,6 +208,8 @@ Resultado verificado sobre el build de producción:
 | Calendario, eventos, confirmaciones, asistencia oficial (5 estados), historial, QR rotatorio, avisos de última hora | ✅ | QR: código HMAC que cambia cada 20 s, ventana horaria del evento, un registro por persona. No impide del todo un registro remoto (alguien podría enviar una foto del QR en esos 20 s). |
 | Biblioteca: fichas, carpetas, etiquetas, favoritas, búsqueda, versiones de partituras, grabaciones, control de cambios | ✅ | |
 | Importación de libretos PDF: separación por marcha con detección de título y autor revisable | ✅ | |
+| Lectura de notas de PDF vectoriales (Sibelius): reproducir la parte, nombre de cada nota, repeticiones, tresillos y ligaduras | ✅ | Transcripción automática revisable |
+| Inicio sencillo: ¿voy o no voy?, la marcha que ha puesto el director y lista de marchas para tocar | ✅ | |
 | Partitura personalizada por instrumento y voz en el ensayo en directo | ✅ | Probado con corneta 3ª y trompeta. |
 | Dirección en tiempo real (selección, inicio/pausa/parada, compases, bucle, secciones, tempo, metrónomo, mensajes por sección, seguimiento, silencio, cambio de vista, plan de trabajo, presencia, resumen) | ✅ | Ver limitación de latencia de audio en §1. |
 | Anotaciones PDF en capas (lápiz, resaltador, texto, formas, flechas, símbolos, borrar, deshacer/rehacer, autoguardado, trazo en directo) | ✅ | Coordenadas normalizadas; el original no se modifica. |

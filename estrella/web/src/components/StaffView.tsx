@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, Beam, Dot, Articulation, Annotation, Barline, StaveTie, StaveText } from 'vexflow';
-import { accidentalsFor, staffPosition, placement, measureFill, measureCapacity, type ScoreDoc, type Note } from '../../../shared/music';
+import { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, Beam, Dot, Articulation, Annotation, Barline, StaveTie, StaveText, Tuplet, Volta } from 'vexflow';
+import { accidentalsFor, staffPosition, placement, measureFill, measureCapacity, noteQuarters, DUR_QUARTERS, STEP_ES, type ScoreDoc, type Note } from '../../../shared/music';
 
 const KEY_NAMES: Record<number, string> = { [-7]: 'Cb', [-6]: 'Gb', [-5]: 'Db', [-4]: 'Ab', [-3]: 'Eb', [-2]: 'Bb', [-1]: 'F', 0: 'C', 1: 'G', 2: 'D', 3: 'A', 4: 'E', 5: 'B', 6: 'F#', 7: 'C#' };
 const ART: Record<string, string> = { staccato: 'a.', accent: 'a>', tenuto: 'a-', marcato: 'a^', fermata: 'a@a' };
@@ -23,6 +23,8 @@ interface Props {
   scale?: number;
   maxMeasures?: number;
   compact?: boolean;
+  /** escribe el nombre de cada nota (Do, Re♯…) debajo */
+  noteNames?: boolean;
 }
 
 function keyOf(n: Note, clef: string) {
@@ -90,6 +92,11 @@ export default function StaffView(p: Props) {
         if (m.repeatStart) stave.setBegBarType(Barline.type.REPEAT_BEGIN);
         if (m.repeatEnd) stave.setEndBarType(Barline.type.REPEAT_END);
         if (mi === measures.length - 1 && !m.repeatEnd) stave.setEndBarType(Barline.type.END);
+        if (m.volta) {
+          const prevV = measures[mi - 1]?.volta === m.volta; const nextV = measures[mi + 1]?.volta === m.volta;
+          const type = !prevV && !nextV ? Volta.type.BEGIN_END : !prevV ? Volta.type.BEGIN : !nextV ? Volta.type.END : Volta.type.MID;
+          stave.setVoltaType(type, `${m.volta}.`, -6);
+        }
         if (m.mark) stave.addModifier(new StaveText(m.mark, 3 /* ABOVE */, { shift_y: -8, justification: 1 }));
         stave.setContext(ctx).draw();
         const accs = accByMeasure.get(m.id)!;
@@ -99,6 +106,10 @@ export default function StaffView(p: Props) {
           if (n.dots) Dot.buildAndAttach([sn], { all: true });
           if (accs[ni]) sn.addModifier(new Accidental(accs[ni]!), 0);
           for (const a of n.artic ?? []) { const ar = new Articulation(ART[a]); if (a === 'fermata') ar.setPosition(3); sn.addModifier(ar, 0); }
+          if (p.noteNames && !n.rest && n.step && doc.clef !== 'percussion') {
+            const nm = new Annotation(`${STEP_ES[n.step]}${(n.alter ?? 0) > 0 ? '♯' : (n.alter ?? 0) < 0 ? '♭' : ''}`);
+            nm.setFont('Inter', 10, 'bold'); nm.setVerticalJustification(Annotation.VerticalJustify.BOTTOM); sn.addModifier(nm, 0);
+          }
           if (n.dyn) { const an = new Annotation(n.dyn); an.setFont('Times', 13, 'bold', 'italic'); an.setVerticalJustification(Annotation.VerticalJustify.BOTTOM); sn.addModifier(an, 0); }
           let color: string | null = null;
           if (p.colorMode && !n.rest && n.step && doc.clef !== 'percussion') color = placement(staffPosition(n.step, n.octave!, doc.clef)) === 'linea' ? COLOR_LINE : COLOR_OUT;
@@ -109,12 +120,23 @@ export default function StaffView(p: Props) {
           return sn;
         });
         if (notes.length) {
+          // tresillos: grupos consecutivos que suman dos unidades de su figura más breve
+          const tuplets: Tuplet[] = [];
+          for (let i = 0; i < m.notes.length;) {
+            if (!m.notes[i].triplet) { i++; continue; }
+            const unit = DUR_QUARTERS[m.notes[i].dur];
+            let j = i; let acc = 0; let u = unit;
+            while (j < m.notes.length && m.notes[j].triplet) { u = Math.min(u, DUR_QUARTERS[m.notes[j].dur]); acc += noteQuarters(m.notes[j]); j++; if (Math.abs(acc - 2 * u) < 1e-6) break; }
+            tuplets.push(new Tuplet(notes.slice(i, j), { num_notes: 3, notes_occupied: 2, ratioed: false } as any));
+            i = j;
+          }
           const voice = new Voice({ num_beats: doc.time[0], beat_value: doc.time[1] }).setMode(Voice.Mode.SOFT);
           voice.addTickables(notes);
           const beams = Beam.generateBeams(notes.filter((_, i) => !m.notes[i].rest), { maintain_stem_directions: false });
           new Formatter().joinVoices([voice]).format([voice], Math.max(40, w - (k === 0 ? first : 0) - 24));
           voice.draw(ctx, stave);
           beams.forEach((b) => b.setContext(ctx).draw());
+          tuplets.forEach((t) => t.setContext(ctx).draw());
           // ligaduras de prolongación (también entre compases)
           if (prevTie && prevLast && notes[0] && !m.notes[0].rest) new StaveTie({ first_note: prevLast, last_note: notes[0], first_indices: [0], last_indices: [0] }).setContext(ctx).draw();
           m.notes.forEach((n, i) => { if (n.tie && i < m.notes.length - 1 && !m.notes[i + 1].rest) new StaveTie({ first_note: notes[i], last_note: notes[i + 1], first_indices: [0], last_indices: [0] }).setContext(ctx).draw(); });
@@ -126,7 +148,7 @@ export default function StaffView(p: Props) {
       });
     });
     setRects(out);
-  }, [p.doc, width, p.colorMode, p.selectedNoteId, p.playingNoteId, scale, p.changedNoteIds, p.maxMeasures, p.compact]);
+  }, [p.doc, width, p.colorMode, p.selectedNoteId, p.playingNoteId, scale, p.changedNoteIds, p.maxMeasures, p.compact, p.noteNames]);
 
   const click = (e: React.MouseEvent) => {
     const g = (e.target as Element).closest('.vf-stavenote');

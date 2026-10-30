@@ -34,7 +34,7 @@ scoresRouter.get('/:id', h(async (req, res) => {
     from score_versions sv left join users u on u.id = sv.author_id where sv.score_id = $1 order by sv.number desc`, [s.id]);
   res.json({
     id: s.id, marcha_id: s.marcha_id, marcha_title: s.marcha_title, label: s.label, instrument_id: s.instrument_id, instrument: s.instrument,
-    voice_id: s.voice_id, voice: s.voice, part_id: s.part_id, source: s.source, source_file_id: s.source_file_id, needs_review: s.needs_review,
+    voice_id: s.voice_id, voice: s.voice, part_id: s.part_id, source: s.source, source_file_id: s.source_file_id, needs_review: s.needs_review, review_measures: s.review_measures ?? [],
     published: published?.content ?? null, published_version_id: s.published_version_id, version_number: s.version_number, published_at: s.published_at, published_by: s.published_by,
     versions,
     ...(editor ? { draft: s.draft, draft_rev: s.draft_rev, draft_updated_at: s.draft_updated_at, draft_updated_by: s.draft_updated_by_name } : {}),
@@ -45,6 +45,47 @@ scoresRouter.get('/:id/versions/:vid', h(async (req, res) => {
   const v = await one<any>(`select sv.*, u.name as author from score_versions sv left join users u on u.id = sv.author_id where sv.id = $1 and sv.score_id = $2`, [req.params.vid, req.params.id]);
   if (!v) throw new HttpError(404, 'Versión no encontrada.');
   res.json(v);
+}));
+
+// ===== Notas a partir de las partituras PDF =====
+// El navegador de la dirección lee cada PDF (vectorial, exportado de Sibelius) y envía la transcripción.
+
+/** Partes en PDF que aún no tienen notas: las que no tienen partitura editable hecha a mano y las de PDF desactualizado. */
+scoresRouter.get('/pdf/pending', publisher, h(async (req, res) => {
+  const all = req.query.all === '1';
+  res.json(await q(`select p.id as part_id, p.marcha_id, m.title, p.label, p.instrument_id, p.voice_id, p.file_id, p.page_from, p.page_to, coalesce(i.transposition, 0) as transposition,
+      s.id as score_id, s.source
+    from parts p join marchas m on m.id = p.marcha_id join files f on f.id = p.file_id left join instruments i on i.id = p.instrument_id
+    left join scores s on s.marcha_id = p.marcha_id and s.instrument_id is not distinct from p.instrument_id and s.voice_id is not distinct from p.voice_id
+    where p.active and p.instrument_id is not null and f.kind = 'pdf' and not m.is_demo
+      and (s.id is null or (s.source = 'pdf' and (s.part_id is distinct from p.id or $1)))
+    order by m.title`, [all]));
+}));
+
+/** Guarda y publica la transcripción de una parte. Nunca sustituye una partitura editable hecha a mano o desde MusicXML. */
+scoresRouter.post('/pdf/:partId', publisher, h(async (req, res) => {
+  const b = parse(z.object({ content: z.any(), review: z.array(z.number().int()).max(2000), warnings: z.array(z.string().max(300)).max(50).default([]) }), req.body);
+  const err = validateScore(b.content);
+  if (err) throw new HttpError(400, `Transcripción no válida: ${err}`);
+  const p = await one<any>(`select p.*, m.title from parts p join marchas m on m.id = p.marcha_id where p.id = $1 and p.active`, [req.params.partId]);
+  if (!p || p.instrument_id == null) throw new HttpError(404, 'Partitura no encontrada.');
+  const existing = await one<any>('select id, source from scores where marcha_id = $1 and instrument_id is not distinct from $2 and voice_id is not distinct from $3',
+    [p.marcha_id, p.instrument_id, p.voice_id]);
+  if (existing && existing.source !== 'pdf') throw new HttpError(409, 'Esta voz ya tiene una partitura editable hecha por la dirección: no se sustituye.');
+  const content = { ...b.content, title: p.title } as ScoreDoc;
+  const scoreId = existing?.id ?? (await one<any>(`insert into scores(marcha_id, instrument_id, voice_id, part_id, label, source, draft, draft_updated_by, draft_updated_at)
+      values ($1,$2,$3,$4,$5,'pdf',$6,$7,now()) returning id`, [p.marcha_id, p.instrument_id, p.voice_id, p.id, p.label, JSON.stringify(content), req.user!.id])).id;
+  const desc = `Notas leídas automáticamente del PDF «${p.label}» (v${p.version})${b.review.length ? ` · ${b.review.length} compases por revisar` : ''}`;
+  let number: number | null = null;
+  try {
+    const { v, msg } = await publishContent(scoreId, content, desc, req.user!.id, null);
+    number = v.number;
+    hub.publish(`marcha:${p.marcha_id}`, msg);
+  } catch (e) {
+    if (!(e instanceof HttpError && e.status === 400)) throw e; // sin cambios respecto a la versión publicada
+  }
+  await q('update scores set part_id = $2, needs_review = $3, review_measures = $4 where id = $1', [scoreId, p.id, b.review.length > 0, b.review]);
+  res.json({ score_id: scoreId, version: number, review: b.review.length });
 }));
 
 // Crear partitura editable: desde MusicXML (ya interpretado por el cliente, con el archivo original adjunto) o vacía

@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { PDFDocument } from 'pdf-lib';
-import { validateBook, type BookEntry } from '../../../shared/book.ts';
+import { validateBook } from '../../../shared/book.ts';
 import { q, one, tx, audit, type Db } from '../db.ts';
 import { h, parse, HttpError } from '../lib/http.ts';
 import { requireAuth, requirePerm } from '../lib/auth.ts';
@@ -14,7 +13,7 @@ libraryRouter.use(requireAuth);
 const manage = requirePerm('library.manage');
 
 const PART_SELECT = `select p.id, p.marcha_id, p.instrument_id, i.name as instrument, p.voice_id, v.name as voice, p.label, p.arrangement,
-  p.file_id, f.kind as file_kind, f.mime, f.original_name, f.size, p.page_count, p.version, p.active, p.replaces_part_id, p.created_at,
+  p.file_id, f.kind as file_kind, f.mime, f.original_name, f.size, p.page_count, p.page_from, p.page_to, p.version, p.active, p.replaces_part_id, p.created_at,
   (select count(*) from part_measures pm where pm.part_id = p.id)::int as mapped_measures
   from parts p join files f on f.id = p.file_id left join instruments i on i.id = p.instrument_id left join voices v on v.id = p.voice_id`;
 
@@ -245,8 +244,8 @@ libraryRouter.post('/marchas/:id/parts', manage, upload.single('file'), h(async 
 
 /**
  * Libreto: un PDF con muchas marchas de un mismo instrumento y voz. La dirección revisa en el navegador
- * qué páginas son de cada marcha; aquí se separa cada una en su propio PDF (el original no se modifica),
- * se crea la marcha si no existe (se busca por título) y se añade —o se versiona— su partitura.
+ * qué páginas son de cada marcha; el PDF se guarda una sola vez, sin modificarlo, y cada marcha apunta a su
+ * tramo de páginas. Se crea la marcha si no existe (se busca por título) y se añade —o se versiona— su partitura.
  */
 libraryRouter.post('/import-book', manage, upload.single('file'), h(async (req, res) => {
   if (!req.file) throw new HttpError(400, 'Falta el PDF del libreto.');
@@ -264,23 +263,13 @@ libraryRouter.post('/import-book', manage, upload.single('file'), h(async (req, 
     const ok = await one('select 1 from voices where id = $1 and instrument_id = $2', [b.voice_id, b.instrument_id]);
     if (!ok) throw new HttpError(400, 'La voz no pertenece al instrumento indicado.');
   } else if (!(await one('select 1 from instruments where id = $1', [b.instrument_id]))) throw new HttpError(400, 'Instrumento no válido.');
-  let src: PDFDocument;
-  try { src = await PDFDocument.load(req.file.buffer, { updateMetadata: false }); } catch { throw new HttpError(415, 'El archivo no es un PDF legible.'); }
-  const err = validateBook(b.entries, src.getPageCount());
+  const b2 = parse(z.object({ page_count: z.coerce.number().int().min(1).max(2000) }), req.body);
+  const err = validateBook(b.entries, b2.page_count);
   if (err) throw new HttpError(400, err);
-
-  // se preparan los PDF antes de abrir la transacción
-  const pieces: { entry: BookEntry; buf: Buffer }[] = [];
-  for (const e of b.entries) {
-    const out = await PDFDocument.create();
-    const pages = await out.copyPages(src, Array.from({ length: e.to - e.from + 1 }, (_, i) => e.from - 1 + i));
-    pages.forEach((p) => out.addPage(p));
-    out.setTitle(e.title);
-    pieces.push({ entry: e, buf: Buffer.from(await out.save()) });
-  }
   const results = await tx(async (c) => {
+    const f = await storeFile(req.file!.buffer, req.file!.originalname, req.user!.id, ['pdf'], c);
     const out: { marcha_id: string; title: string; status: 'creada' | 'añadida' | 'nueva_version'; pages: number; replaces: string | null }[] = [];
-    for (const { entry: e, buf } of pieces) {
+    for (const e of b.entries) {
       let m = await one<any>('select id, composer from marchas where not is_demo and unaccent_lower(title) = unaccent_lower($1) order by created_at limit 1', [e.title], c);
       let status: 'creada' | 'añadida' | 'nueva_version' = 'añadida';
       if (!m) {
@@ -288,13 +277,11 @@ libraryRouter.post('/import-book', manage, upload.single('file'), h(async (req, 
         await q('insert into marcha_changes(marcha_id, user_id, summary) values ($1,$2,$3)', [m.id, req.user!.id, 'Marcha creada al importar un libreto'], c);
         status = 'creada';
       } else if (!m.composer && e.composer) await q('update marchas set composer = $2, updated_at = now() where id = $1', [m.id, e.composer], c);
-      const name = `${e.title} - ${b.label}.pdf`.replace(/[\\/:*?"<>|]/g, ' ');
-      const f = await storeFile(buf, name, req.user!.id, ['pdf'], c);
       const old = await one<any>(`select id, version from parts where marcha_id = $1 and active and instrument_id = $2 and voice_id is not distinct from $3 for update`, [m.id, b.instrument_id, b.voice_id ?? null], c);
       if (old) { await q('update parts set active = false where id = $1', [old.id], c); if (status !== 'creada') status = 'nueva_version'; }
-      await q(`insert into parts(marcha_id, instrument_id, voice_id, label, arrangement, file_id, page_count, version, replaces_part_id, created_by)
-        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [m.id, b.instrument_id, b.voice_id ?? null, b.label, b.arrangement ?? null, f.id, e.to - e.from + 1, old ? old.version + 1 : 1, old?.id ?? null, req.user!.id], c);
+      await q(`insert into parts(marcha_id, instrument_id, voice_id, label, arrangement, file_id, page_count, page_from, page_to, version, replaces_part_id, created_by)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [m.id, b.instrument_id, b.voice_id ?? null, b.label, b.arrangement ?? null, f.id, e.to - e.from + 1, e.from, e.to, old ? old.version + 1 : 1, old?.id ?? null, req.user!.id], c);
       await q('insert into marcha_changes(marcha_id, user_id, summary) values ($1,$2,$3)', [m.id, req.user!.id,
         old ? `Partitura «${b.label}» sustituida desde un libreto (versión ${old.version + 1})` : `Partitura «${b.label}» añadida desde un libreto`], c);
       out.push({ marcha_id: m.id, title: e.title, status, pages: e.to - e.from + 1, replaces: old?.id ?? null });

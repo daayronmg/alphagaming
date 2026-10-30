@@ -355,7 +355,7 @@ function ComparePdf({ partId }: { partId: string }) {
     <div className="card stack sm" style={{ position: 'sticky', top: 80 }}>
       <div className="row between"><h3>PDF original · {p.data.label}</h3><div className="row"><button className="btn sm" onClick={() => setZoom(Math.max(0.6, zoom - 0.2))}>−</button><button className="btn sm" onClick={() => setZoom(zoom + 0.2)}>+</button></div></div>
       <div style={{ maxHeight: '75vh', overflow: 'auto', background: '#3a3f4b', padding: 10, borderRadius: 12 }}>
-        <ScoreCanvas url={fileUrl(p.data.file_id)} kind={p.data.file_kind === 'image' ? 'image' : 'pdf'} zoom={zoom} tool="none" color="#000" width={2} symbol="" annotations={[]} measureMap={p.data.measures_map} highlights={[]} />
+        <ScoreCanvas url={fileUrl(p.data.file_id)} range={p.data.page_from ? [p.data.page_from, p.data.page_to] : null} kind={p.data.file_kind === 'image' ? 'image' : 'pdf'} zoom={zoom} tool="none" color="#000" width={2} symbol="" annotations={[]} measureMap={p.data.measures_map} highlights={[]} />
       </div>
       <p className="xs faint">El original se conserva siempre sin cambios.</p>
       <AlertTriangle size={0} />
