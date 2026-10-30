@@ -20,7 +20,7 @@ services:
       - key: STORAGE_MODE
         value: db
       - key: SEED_DEMO
-        value: "1"
+        value: "0"
       - key: SUPABASE_PROJECT_REF
         value: vqkeegxhgcnnozvxthqf
       - key: SUPABASE_REGION
