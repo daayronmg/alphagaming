@@ -1,0 +1,30 @@
+# Despliegue sencillo en un servidor propio. Coloca delante un proxy HTTPS (Caddy, Nginx, Traefik).
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: estrella
+      POSTGRES_USER: estrella
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
+    volumes:
+      - db:/var/lib/postgresql/data
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on: [db]
+    environment:
+      DATABASE_URL: postgres://estrella:${POSTGRES_PASSWORD}@db:5432/estrella
+      PUBLIC_URL: ${PUBLIC_URL:?define PUBLIC_URL, p. ej. https://estrella.tudominio.es}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5-5}
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-ESTRELLA <no-responder@example.com>}
+      AUDIVERIS_PATH: ${AUDIVERIS_PATH:-}
+    volumes:
+      - storage:/data/storage
+    ports:
+      - "127.0.0.1:4000:4000"
+volumes:
+  db:
+  storage:
