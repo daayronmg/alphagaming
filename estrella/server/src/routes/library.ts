@@ -121,6 +121,23 @@ libraryRouter.get('/marchas/:id', h(async (req, res) => {
   res.json({ ...m, favorite: !!m.favorite, tags, parts, old_parts: oldParts, recordings, scores, changes, history, mine });
 }));
 
+/**
+ * Versión ligera para la página «Tocar» y el directo: solo lo que necesita el móvil del músico.
+ * Cuando el director pone una marcha la piden todos a la vez, así que evita el historial y la ficha completa.
+ */
+libraryRouter.get('/marchas/:id/play', h(async (req, res) => {
+  const [m, scores, recordings, mine] = await Promise.all([
+    one<any>('select id, title, composer, is_demo from marchas where id = $1', [req.params.id]),
+    q(`select s.id, s.label, s.instrument_id, s.voice_id, s.published_version_id, (s.draft is not null) as has_draft from scores s
+       left join instruments i on i.id = s.instrument_id left join voices v on v.id = s.voice_id where s.marcha_id = $1 order by i.sort, v.sort`, [req.params.id]),
+    q(`select r.id, r.file_id, r.label, r.kind from recordings r where r.marcha_id = $1 order by r.created_at`, [req.params.id]),
+    resolvePart(req.user!.id, req.params.id),
+  ]);
+  if (!m) throw new HttpError(404, 'Marcha no encontrada.');
+  q(`insert into material_usage(user_id, kind, ref_id) values ($1,'marcha',$2)`, [req.user!.id, m.id]).catch(() => {});
+  res.json({ ...m, scores, recordings, mine });
+}));
+
 const marchaBody = z.object({
   title: z.string().min(1).max(200),
   composer: z.string().max(200).nullable().optional(),

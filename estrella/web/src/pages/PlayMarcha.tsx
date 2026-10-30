@@ -20,13 +20,13 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const id = marchaId ?? params.id;
   const { can } = useAuth();
   const toast = useToast();
-  const m = useLoad(() => get(`/library/marchas/${id}`), [id]);
+  const m = useLoad(() => get(`/library/marchas/${id}/play`), [id]);
   // voz que se escucha: la propia; quien no tiene asignación (la dirección) elige entre las publicadas
   const [voice, setVoice] = useState<string | null>(null);
   useEffect(() => setVoice(null), [id]);
   const published = ((m.data?.scores ?? []) as any[]).filter((x) => x.published_version_id);
   const scoreId = (voice ?? m.data?.mine?.score?.id ?? (!m.data?.mine?.assignment ? published[0]?.id : undefined)) as string | undefined;
-  const score = useLoad(() => (scoreId ? get(`/scores/${scoreId}`) : Promise.resolve(null)), [scoreId]);
+  const score = useLoad(() => (scoreId ? get(`/scores/${scoreId}?light=1`) : Promise.resolve(null)), [scoreId]);
   const [playing, setPlaying] = useState(false);
   const [noteId, setNoteId] = useState<string | null>(null);
   const [measure, setMeasure] = useState<number | null>(null);

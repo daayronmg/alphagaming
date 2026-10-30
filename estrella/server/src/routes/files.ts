@@ -8,6 +8,12 @@ export const filesRouter = Router();
 
 /** Envía un archivo desde disco o desde la base de datos (con soporte de rangos para audio). */
 async function sendStored(req: Request, res: Response, f: any) {
+  // el contenido no cambia nunca: si el navegador ya lo tiene, no se vuelve a enviar
+  if (f.sha256) {
+    const etag = `"${f.sha256}"`;
+    res.setHeader('ETag', etag);
+    if (req.headers['if-none-match'] === etag) return res.status(304).end();
+  }
   if (f.storage_path !== 'db') return res.type(f.mime).sendFile(filePath(f.storage_path), { acceptRanges: true });
   const buf = await readFileData(f);
   res.type(f.mime);

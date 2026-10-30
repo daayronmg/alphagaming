@@ -28,6 +28,6 @@ services:
       - key: DB_USER
         value: estrella_app
       - key: DB_POOL_MAX
-        value: "5"
+        value: "10"
       - key: DB_PASSWORD
         sync: false

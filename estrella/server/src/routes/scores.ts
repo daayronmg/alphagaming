@@ -24,13 +24,27 @@ async function scoreMeta(id: string) {
     where s.id = $1`, [id]);
 }
 
+// las versiones publicadas no cambian: cuando el director pone una marcha, 100 músicos piden la misma a la vez
+const versionCache = new Map<string, Promise<{ content: any } | undefined>>();
+function versionContent(id: string) {
+  let p = versionCache.get(id);
+  if (!p) {
+    p = one<any>('select content from score_versions where id = $1', [id]);
+    p.catch(() => versionCache.delete(id));
+    versionCache.set(id, p);
+    if (versionCache.size > 500) versionCache.delete(versionCache.keys().next().value!);
+  }
+  return p;
+}
+
 scoresRouter.get('/:id', h(async (req, res) => {
   const s = await scoreMeta(req.params.id);
   if (!s) throw new HttpError(404, 'Partitura no encontrada.');
   const editor = can(req.user, 'scores.publish');
-  const published = s.published_version_id ? await one<any>('select content from score_versions where id = $1', [s.published_version_id]) : null;
+  const published = s.published_version_id ? await versionContent(s.published_version_id) : null;
   if (!published && !editor) throw new HttpError(404, 'Esta partitura todavía no se ha publicado.');
-  const versions = await q(`select sv.id, sv.number, sv.description, sv.changes, sv.created_at, sv.restored_from, u.name as author
+  // ?light=1: sin el historial de versiones (lo usan los músicos para tocar)
+  const versions = req.query.light === '1' ? [] : await q(`select sv.id, sv.number, sv.description, sv.changes, sv.created_at, sv.restored_from, u.name as author
     from score_versions sv left join users u on u.id = sv.author_id where sv.score_id = $1 order by sv.number desc`, [s.id]);
   res.json({
     id: s.id, marcha_id: s.marcha_id, marcha_title: s.marcha_title, label: s.label, instrument_id: s.instrument_id, instrument: s.instrument,
