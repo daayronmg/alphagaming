@@ -15,6 +15,8 @@ if (config.seedDemo && !(await pool.query('select 1 from users limit 1')).rowCou
   console.log('Base de datos vacía: cargados los datos de demostración.');
 }
 fs.mkdirSync(config.storageDir, { recursive: true });
+// paso a uso real: limpieza única de los datos de demostración (si se ha pedido)
+await import('./lib/purgeDemo.ts').then((m) => m.purgeDemoOnce()).catch((e) => console.error('[demo]', e));
 // repertorio incluido con la aplicación: se carga en segundo plano la primera vez
 import('./lib/bundledBooks.ts').then((m) => m.importBundledBooks()).catch((e) => console.error('[libretos]', e));
 const app = createApp();
