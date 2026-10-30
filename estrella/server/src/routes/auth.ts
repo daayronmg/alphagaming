@@ -5,6 +5,7 @@ import { h, parse, HttpError } from '../lib/http.ts';
 import {
   COOKIE, createSession, hashPassword, verifyPassword, validatePassword, sha256, randomToken, requireAuth,
   loginRateLimited, clearLoginAttempts, GLOBAL_PERMISSIONS, SECTION_PERMISSIONS,
+  forgetSession, forgetUser,
 } from '../lib/auth.ts';
 import { config } from '../config.ts';
 import { sendMail } from '../lib/mail.ts';
@@ -26,7 +27,7 @@ authRouter.post('/login', h(async (req, res) => {
 }));
 
 authRouter.post('/logout', h(async (req, res) => {
-  if (req.sessionId) await q('delete from sessions where id = $1', [req.sessionId]);
+  if (req.sessionId) { await q('delete from sessions where id = $1', [req.sessionId]); forgetSession(req.sessionId); }
   res.clearCookie(COOKIE, { path: '/' });
   res.json({ ok: true });
 }));
@@ -106,6 +107,7 @@ authRouter.post('/reset', h(async (req, res) => {
     await q('update password_resets set used_at = now() where token_hash = $1', [sha256(b.token)], c);
     await q('update users set password_hash = $2 where id = $1', [r.user_id, hashPassword(b.password)], c);
     await q('delete from sessions where user_id = $1', [r.user_id], c); // cierra todas las sesiones
+    forgetUser(r.user_id);
     await audit(r.user_id, 'password_reset', 'user', r.user_id, null, c);
   });
   res.json({ ok: true });
@@ -119,6 +121,7 @@ authRouter.post('/password', requireAuth, h(async (req, res) => {
   if (pwErr) throw new HttpError(400, pwErr);
   await q('update users set password_hash = $2 where id = $1', [req.user!.id, hashPassword(b.password)]);
   await q('delete from sessions where user_id = $1 and id <> $2', [req.user!.id, req.sessionId]);
+  forgetUser(req.user!.id);
   res.json({ ok: true });
 }));
 
@@ -128,6 +131,7 @@ authRouter.get('/sessions', requireAuth, h(async (req, res) => {
 }));
 authRouter.delete('/sessions/:prefix', requireAuth, h(async (req, res) => {
   await q(`delete from sessions where user_id = $1 and left(id, 12) = $2 and id <> $3`, [req.user!.id, req.params.prefix, req.sessionId]);
+  forgetUser(req.user!.id);
   res.json({ ok: true });
 }));
 

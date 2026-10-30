@@ -53,20 +53,36 @@ export async function createSession(res: Response, userId: string, userAgent?: s
 }
 
 export async function loadUserById(id: string): Promise<AuthUser | undefined> {
-  const u = await one<any>(`select id, name, email, role, permissions from users where id = $1 and status = 'active'`, [id]);
+  const [u, leaderOf, secs] = await Promise.all([
+    one<any>(`select id, name, email, role, permissions from users where id = $1 and status = 'active'`, [id]),
+    q<any>('select section_id, permissions from section_leaders where user_id = $1', [id]),
+    q<any>(`select distinct i.section_id from user_assignments a join instruments i on i.id = a.instrument_id where a.user_id = $1`, [id]),
+  ]);
   if (!u) return undefined;
-  const leaderOf = await q<any>('select section_id, permissions from section_leaders where user_id = $1', [id]);
-  const secs = await q<any>(`select distinct i.section_id from user_assignments a join instruments i on i.id = a.instrument_id where a.user_id = $1`, [id]);
   return { ...u, leaderOf, sectionIds: secs.map((s) => s.section_id) };
 }
+
+/**
+ * Cada petición necesita saber quién la hace: se recuerda unos segundos para no repetir las mismas
+ * consultas en cada llamada (el móvil hace varias seguidas al abrir una pantalla).
+ * Cerrar sesión la olvida al momento; los cambios de rol o instrumento se notan en, como mucho, 15 s.
+ */
+const SESSION_TTL = 15_000;
+const sessionCache = new Map<string, { at: number; user: AuthUser; lastSeen: number }>();
+export function forgetSession(sid: string) { sessionCache.delete(sid); }
+export function forgetUser(userId: string) { for (const [k, v] of sessionCache) if (v.user.id === userId) sessionCache.delete(k); }
 
 export async function userFromToken(token: string | undefined): Promise<{ user: AuthUser; sid: string } | undefined> {
   if (!token) return undefined;
   const sid = sha256(token);
+  const hit = sessionCache.get(sid);
+  if (hit && Date.now() - hit.at < SESSION_TTL) return { user: hit.user, sid };
   const s = await one<any>('select user_id, last_seen_at from sessions where id = $1 and expires_at > now()', [sid]);
-  if (!s) return undefined;
+  if (!s) { sessionCache.delete(sid); return undefined; }
   const user = await loadUserById(s.user_id);
   if (!user) return undefined;
+  if (sessionCache.size > 2000) sessionCache.clear();
+  sessionCache.set(sid, { at: Date.now(), user, lastSeen: new Date(s.last_seen_at).getTime() });
   if (Date.now() - new Date(s.last_seen_at).getTime() > 5 * 60_000) {
     q('update sessions set last_seen_at = now() where id = $1', [sid]).catch(() => {});
   }
