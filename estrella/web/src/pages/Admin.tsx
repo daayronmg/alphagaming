@@ -95,7 +95,7 @@ function Leaders() {
 function Branding() {
   const { branding, me } = useAuth();
   const toast = useToast();
-  const [f, setF] = useState({ appName: branding.appName ?? 'ESTRELLA', bandName: branding.bandName ?? '', accent: branding.accent ?? '#c9a227', instagram: branding.instagram ?? '' });
+  const [f, setF] = useState({ appName: branding.appName ?? 'ESTRELLA', bandName: branding.bandName ?? '', accent: branding.accent && branding.accent.toLowerCase() !== '#c9a227' ? branding.accent : '#9b1c31', instagram: branding.instagram ?? '' });
   if (me?.role !== 'director') return <Notice kind="warn">Solo la dirección cambia la identidad.</Notice>;
   return (
     <div className="card stack" style={{ maxWidth: 640 }}>

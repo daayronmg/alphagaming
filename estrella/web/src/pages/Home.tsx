@@ -1,3 +1,4 @@
+import { logoUrl } from '../components/Layout';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarDays, Radio, Music, ChevronRight, Plus, MessageCircleQuestion, Baton, Check, X, Search, Play, MapPin, Clock } from '../components/icons';
@@ -46,9 +47,9 @@ export default function Home() {
   return (
     <div className="page stack lg home-simple">
       <section className="hero row nowrap" style={{ gap: 16 }}>
-        {branding.logoFileId && <img src="/api/files/logo" alt={branding.bandName} className="home-logo" />}
+        <img src={logoUrl(branding)} alt={branding.bandName} className="home-logo" />
         <div className="grow">
-          <div className="eyebrow" style={{ color: 'var(--accent)' }}>{branding.bandName}</div>
+          <div className="eyebrow">{greeting()}</div>
           <h1 style={{ marginTop: 4 }}>Hola, {me.name.split(' ')[0]}</h1>
           <div className="row" style={{ marginTop: 8 }}>
             {me.assignments.map((a) => <span key={a.id} className={`badge ${a.is_default ? 'accent' : ''}`}><Music size={12} /> {assignmentLabel(a)}</span>)}
@@ -115,10 +116,6 @@ export default function Home() {
         <Notice key={a.id} kind={a.urgent ? 'danger' : 'info'} title={a.title}>{a.body} <Link to="/avisos" className="faint">· {fmtRelative(a.created_at)}</Link></Notice>
       ))}
 
-      {me.role === 'director' && !branding.logoFileId && (
-        <Notice kind="warn" title="Falta el logo de la banda">Súbelo en <Link to="/admin">Administración → Logotipo</Link> y saldrá en la entrada, en el menú y aquí arriba.</Notice>
-      )}
-
       {director && (
         <div className="row">
           <Link className="btn primary" to={session ? `/direccion/${session.id}` : '/direccion'}><Baton size={18} /> {session ? 'Volver a la consola' : 'Dirigir ensayo'}</Link>
@@ -157,6 +154,7 @@ export default function Home() {
   );
 }
 
+const greeting = () => { const h = new Date().getHours(); return h < 13 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches'; };
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
 function bigDate(iso: string) {
