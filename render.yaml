@@ -1,5 +1,5 @@
 # Despliegue gratuito de ESTRELLA en Render (servidor) + Supabase (base de datos).
-# En Render: New → Blueprint → elige este repositorio. Te pedirá DATABASE_URL y DB_PASSWORD.
+# Render: New → Blueprint → este repositorio. Solo pide DB_PASSWORD (contraseña del usuario estrella_app de Supabase).
 services:
   - type: web
     name: estrella
@@ -19,13 +19,13 @@ services:
         value: db
       - key: SEED_DEMO
         value: "1"
+      - key: SUPABASE_PROJECT_REF
+        value: vqkeegxhgcnnozvxthqf
+      - key: SUPABASE_REGION
+        value: eu-west-3
       - key: DB_USER
         value: estrella_app
       - key: DB_POOL_MAX
         value: "5"
-      - key: DATABASE_URL
-        sync: false
       - key: DB_PASSWORD
-        sync: false
-      - key: ANTHROPIC_API_KEY
         sync: false

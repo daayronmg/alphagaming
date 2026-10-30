@@ -123,13 +123,10 @@ Las partituras de la «Marcha de demostración» son PDF generados automáticame
 - **Base de datos:** proyecto de Supabase (plan gratuito, 500 MB). Las partituras y los audios se guardan dentro de la base de datos (`STORAGE_MODE=db`), así que no hace falta disco.
 - **Servidor:** Render, plan gratuito. Se configura solo con `render.yaml`, en la raíz del repositorio.
 
-Pasos:
-1. En Supabase → tu proyecto → botón **Connect** → **Session pooler**: copia la cadena de conexión tal cual, con `[YOUR-PASSWORD]` incluido.
-2. En [Render](https://render.com), entra con GitHub → **New → Blueprint** → elige este repositorio.
-3. Rellena las dos variables que pide:
-   - `DATABASE_URL`: la cadena del paso 1.
-   - `DB_PASSWORD`: la contraseña del usuario `estrella_app`.
-4. Pulsa **Apply**. A los pocos minutos tienes la web en `https://estrella-xxxx.onrender.com`. La primera vez se cargan los datos de demostración.
+Pasos (el proyecto de Supabase `estrella-banda` y su usuario `estrella_app` ya están creados; `render.yaml` incluye la referencia del proyecto y la app localiza sola el servidor de conexión):
+1. Abre https://render.com/deploy?repo=https://github.com/daayronmg/alphagaming y entra con GitHub.
+2. Rellena `DB_PASSWORD` con la contraseña del usuario `estrella_app` y pulsa **Apply**.
+3. A los pocos minutos tienes la web en `https://estrella-xxxx.onrender.com`. La primera vez se cargan los datos de demostración.
 
 Limitaciones del plan gratuito:
 - El servidor se duerme tras 15 minutos sin uso y tarda unos 50 segundos en despertar. Conviene abrir la web un minuto antes del ensayo.
