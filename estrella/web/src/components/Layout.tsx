@@ -64,7 +64,7 @@ export default function Layout() {
       if (l[0] && !director && autoFollowEnabled() && followed.current !== l[0].id && sessionStorage.getItem('estrella.followed') !== l[0].id && (loc.pathname === '/' || loc.pathname === '/directo')) {
         sessionStorage.setItem('estrella.followed', l[0].id);
         followed.current = l[0].id;
-        nav(`/directo/${l[0].id}`);
+        nav(loc.pathname === '/directo' ? `/directo/${l[0].id}` : '/en-directo');
       }
     } catch { /* */ }
     if (manageDoubts) get('/doubts/counts').then((c) => setDoubtCount(c.nueva + c.pendiente)).catch(() => {});
@@ -82,7 +82,12 @@ export default function Layout() {
       }
       case 'live:started':
         loadSide();
-        if (!director && autoFollowEnabled() && followed.current !== m.sessionId) { followed.current = m.sessionId; sessionStorage.setItem('estrella.followed', m.sessionId); nav(`/directo/${m.sessionId}`); toast({ kind: 'info', title: 'Ensayo en directo', text: `${m.by} ha iniciado la sesión. Te llevamos a tu partitura.` }); }
+        if (!director && autoFollowEnabled() && followed.current !== m.sessionId) {
+          followed.current = m.sessionId; sessionStorage.setItem('estrella.followed', m.sessionId);
+          // pantalla completa sencilla; quien ya estaba en la vista avanzada sigue en ella
+          nav(location.pathname.startsWith('/directo') ? `/directo/${m.sessionId}` : '/en-directo');
+          toast({ kind: 'info', title: 'Ensayo en directo', text: `${m.by} ha empezado el ensayo.` });
+        }
         break;
       case 'live:ended': setLive(null); break;
       case 'doubt:new': if (manageDoubts) { setDoubtCount((n) => n + 1); if (!prefs.mute_non_urgent) toast({ kind: 'info', title: `Duda de ${m.doubt.author_name}`, text: `${m.doubt.marcha_title}: ${m.doubt.text}` }); } break;
@@ -98,7 +103,7 @@ export default function Layout() {
     { to: '/', label: 'Inicio', icon: <Home size={19} /> },
     { to: '/calendario', label: 'Calendario', icon: <CalendarDays size={19} /> },
     { to: '/biblioteca', label: 'Marchas', icon: <Library size={19} /> },
-    { to: live ? `/directo/${live.id}` : '/directo', label: 'Ensayo en directo', icon: <Radio size={19} />, count: live ? 1 : 0 },
+    { to: director ? '/dirigir' : '/en-directo', label: director ? 'Dirigir ensayo' : 'Ensayo en directo', icon: <Radio size={19} />, count: live ? 1 : 0 },
     { to: '/avisos', label: 'Avisos', icon: <Megaphone size={19} />, count: unread },
     { to: '/dudas', label: manageDoubts ? 'Bandeja de dudas' : 'Mis dudas', icon: <MessageCircleQuestion size={19} />, count: manageDoubts ? doubtCount : 0, group: 'Más' },
     { to: '/academia', label: 'Academia', icon: <GraduationCap size={19} />, group: 'Más' },
@@ -119,7 +124,7 @@ export default function Layout() {
   };
 
   return (
-    <div className="app">
+    <div className={`app ${loc.pathname === '/en-directo' ? 'is-immersive' : ''}`}>
       <aside className="sidebar">
         <Link to="/" className="brand">
           <div className="brand-mark"><img src={logoUrl(branding)} alt="" /></div>
@@ -149,10 +154,10 @@ export default function Layout() {
             <button className="btn sm" onClick={() => ackUrgent(urgent[0].id)}>Leído</button>
           </div>
         )}
-        {live && !loc.pathname.startsWith('/directo') && !loc.pathname.startsWith('/direccion') && (
+        {live && !['/directo', '/direccion', '/dirigir', '/en-directo'].some((p) => loc.pathname.startsWith(p)) && (
           <div className="live-banner">
             <span className="dot-status on" /> <span className="grow">Ensayo en directo{live.event_title ? ` · ${live.event_title}` : ''}{live.state?.marchaTitle ? ` · ${live.state.marchaTitle}` : ''}</span>
-            <Link className="btn sm primary" to={director ? `/direccion/${live.id}` : `/directo/${live.id}`}>{director ? 'Abrir consola' : 'Unirme'}</Link>
+            <Link className="btn sm primary" to={director ? '/dirigir' : '/en-directo'}>{director ? 'Dirigir' : 'Entrar'}</Link>
           </div>
         )}
         <header className="topbar">

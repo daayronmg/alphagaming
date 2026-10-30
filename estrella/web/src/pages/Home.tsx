@@ -1,10 +1,10 @@
 import { logoUrl } from '../components/Layout';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, Radio, Music, ChevronRight, Plus, MessageCircleQuestion, Baton, Check, X, Search, Play, MapPin, Clock } from '../components/icons';
+import { CalendarDays, Radio, Music, ChevronRight, Baton, Check, X, Search, Play, MapPin, Clock, CalendarPlus } from '../components/icons';
 import { useAuth } from '../lib/auth';
-import { get, put } from '../lib/api';
-import { useLoad, Notice, useToast, Modal } from '../components/ui';
+import { get, put, post } from '../lib/api';
+import { useLoad, Notice, useToast, Modal, Field } from '../components/ui';
 import { fmtTime, EVENT_TYPES, assignmentLabel, fmtRelative } from '../lib/format';
 import { useRealtime } from '../lib/realtime';
 
@@ -21,6 +21,7 @@ export default function Home() {
   const [q, setQ] = useState('');
   const [absent, setAbsent] = useState<any | null>(null);
   const [other, setOther] = useState('');
+  const [planning, setPlanning] = useState(false);
   useRealtime((m) => {
     if (m.t === 'events:changed') events.reload();
     if (m.t.startsWith('live:')) live.reload();
@@ -58,16 +59,27 @@ export default function Home() {
         </div>
       </section>
 
+      {director && (
+        <div className="director-actions">
+          <button className="director-tile" onClick={() => setPlanning(true)} data-testid="plan-rehearsal">
+            <CalendarPlus size={28} /><b>Programar ensayo</b><span>Día, hora y lugar. A todos les llega para que digan si van.</span>
+          </button>
+          <Link className="director-tile dark" to="/dirigir" data-testid="direct-rehearsal">
+            <Baton size={28} /><b>{session ? 'Seguir dirigiendo' : 'Dirigir ensayo'}</b><span>Tocas una marcha y a todos les sale al momento.</span>
+          </Link>
+        </div>
+      )}
+
       {/* 1. El director está dirigiendo: directo a la marcha */}
       {session && (
-        <Link to={director ? `/direccion/${session.id}` : `/directo/${session.id}`} className="card big-action live" data-testid="home-live">
+        <Link to={director ? '/dirigir' : '/en-directo'} className="card big-action live" data-testid="home-live">
           <span className="dot-status on" />
           <div className="grow">
             <div className="eyebrow">Ensayo en directo</div>
             <h2>{session.state?.marchaTitle ? session.state.marchaTitle : 'El director va a poner una marcha'}</h2>
             <div className="small muted">{session.state?.marchaTitle ? 'El director ha puesto esta marcha. Toca para ver tu partitura.' : 'Entra y te saldrá sola en cuanto la elija.'}</div>
           </div>
-          <span className="btn primary lg"><Radio size={20} /> {director ? 'Consola' : 'Entrar'}</span>
+          <span className="btn primary lg"><Radio size={20} /> {director ? 'Dirigir' : 'Entrar'}</span>
         </Link>
       )}
 
@@ -116,13 +128,6 @@ export default function Home() {
         <Notice key={a.id} kind={a.urgent ? 'danger' : 'info'} title={a.title}>{a.body} <Link to="/avisos" className="faint">· {fmtRelative(a.created_at)}</Link></Notice>
       ))}
 
-      {director && (
-        <div className="row">
-          <Link className="btn primary" to={session ? `/direccion/${session.id}` : '/direccion'}><Baton size={18} /> {session ? 'Volver a la consola' : 'Dirigir ensayo'}</Link>
-          <Link className="btn" to="/calendario?nuevo=1"><Plus size={18} /> Nuevo ensayo</Link>
-          <Link className="btn" to="/dudas"><MessageCircleQuestion size={18} /> Dudas</Link>
-        </div>
-      )}
 
       {/* 3. Elegir una marcha y tocar */}
       <div className="card stack">
@@ -140,6 +145,8 @@ export default function Home() {
           ))}
         </div>
       </div>
+
+      {planning && <PlanRehearsal onClose={() => setPlanning(false)} onDone={() => { setPlanning(false); events.reload(); }} />}
 
       {absent && (
         <Modal title="¿Por qué no puedes ir?" onClose={() => setAbsent(null)}>
@@ -163,4 +170,35 @@ function bigDate(iso: string) {
   if (isToday(iso)) return 'Hoy';
   if (d.toDateString() === tomorrow.toDateString()) return 'Mañana';
   return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+/** Programar un ensayo en tres datos: día, hora y lugar (se convoca a toda la banda). */
+function PlanRehearsal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const tomorrow = new Date(Date.now() + 86400000);
+  const [f, setF] = useState({ date: tomorrow.toISOString().slice(0, 10), time: '20:30', location: localStorage.getItem('estrella.lastPlace') ?? 'Local de ensayo', title: 'Ensayo' });
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try {
+      const starts = new Date(`${f.date}T${f.time}:00`);
+      await post('/events', { type: 'ensayo', title: f.title.trim() || 'Ensayo', starts_at: starts.toISOString(), location: f.location.trim() || null, section_ids: [] });
+      try { localStorage.setItem('estrella.lastPlace', f.location); } catch { /* */ }
+      toast({ kind: 'ok', text: 'Ensayo programado. A todos les aparece para responder si van.' });
+      onDone();
+    } catch (e) { toast({ kind: 'error', text: (e as Error).message }); } finally { setBusy(false); }
+  };
+  const set = (k: keyof typeof f) => (e: any) => setF({ ...f, [k]: e.target.value });
+  return (
+    <Modal title="Programar ensayo" onClose={onClose} footer={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={busy || !f.date || !f.time} onClick={save} data-testid="plan-save">{busy ? 'Guardando…' : 'Programar'}</button></>}>
+      <div className="stack">
+        <div className="form-grid">
+          <Field label="Día"><input className="input" type="date" value={f.date} onChange={set('date')} /></Field>
+          <Field label="Hora"><input className="input" type="time" value={f.time} onChange={set('time')} /></Field>
+        </div>
+        <Field label="Lugar"><input className="input" value={f.location} onChange={set('location')} /></Field>
+        <Field label="Nombre (opcional)"><input className="input" value={f.title} onChange={set('title')} /></Field>
+      </div>
+    </Modal>
+  );
 }

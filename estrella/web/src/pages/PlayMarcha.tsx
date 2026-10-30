@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Play, Square, FileText, ChevronLeft, Info, Wand2, Gauge } from '../components/icons';
+import { Play, Square, FileText, ChevronLeft, Info, Wand2, Gauge, Pencil } from '../components/icons';
 import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useLoad, Spinner, ErrorBox, Notice, useToast } from '../components/ui';
@@ -11,13 +11,21 @@ import { transcribePdf } from '../lib/pdf';
 import { useRealtime } from '../lib/realtime';
 import type { ScoreDoc } from '../../../shared/music';
 
-/** Página sencilla de una marcha: reproducir mi parte, ver las notas que me tocan y abrir el PDF. */
-export default function PlayMarcha() {
-  const { id } = useParams();
+/**
+ * Página sencilla de una marcha: reproducir mi parte, ver las notas que me tocan y abrir el PDF.
+ * `embedded` la usa el ensayo en directo (pantalla completa, sin enlaces de vuelta).
+ */
+export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; embedded?: boolean } = {}) {
+  const params = useParams();
+  const id = marchaId ?? params.id;
   const { can } = useAuth();
   const toast = useToast();
   const m = useLoad(() => get(`/library/marchas/${id}`), [id]);
-  const scoreId = m.data?.mine?.score?.id as string | undefined;
+  // voz que se escucha: la propia; quien no tiene asignación (la dirección) elige entre las publicadas
+  const [voice, setVoice] = useState<string | null>(null);
+  useEffect(() => setVoice(null), [id]);
+  const published = ((m.data?.scores ?? []) as any[]).filter((x) => x.published_version_id);
+  const scoreId = (voice ?? m.data?.mine?.score?.id ?? (!m.data?.mine?.assignment ? published[0]?.id : undefined)) as string | undefined;
   const score = useLoad(() => (scoreId ? get(`/scores/${scoreId}`) : Promise.resolve(null)), [scoreId]);
   const [playing, setPlaying] = useState(false);
   const [noteId, setNoteId] = useState<string | null>(null);
@@ -34,7 +42,8 @@ export default function PlayMarcha() {
     if (measure == null) return;
     staffBox.current?.querySelector('[data-testid=score-measure-highlight]')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [measure]);
-  useRealtime((x) => { if (['parts:changed', 'score:published'].includes(x.t) && x.marchaId === id) m.reload(); }, [id]);
+  // si la dirección corrige las notas, se ven al momento
+  useRealtime((x) => { if (['parts:changed', 'score:published'].includes(x.t) && x.marchaId === id) { m.reload(); score.reload(); } }, [id, scoreId]);
   useEffect(() => () => pb.current?.stop(), []);
   useEffect(() => { try { localStorage.setItem('estrella.speed', String(speed)); localStorage.setItem('estrella.noteNames', names ? '1' : '0'); } catch { /* */ } }, [speed, names]);
 
@@ -75,22 +84,33 @@ export default function PlayMarcha() {
   };
 
   return (
-    <div className="page stack">
-      <div className="row between">
-        <Link to="/" className="btn ghost sm"><ChevronLeft size={16} /> Inicio</Link>
-        {can('library.manage') && <Link to={`/marchas/${x.id}`} className="btn ghost sm">Ficha completa</Link>}
-      </div>
+    <div className={embedded ? 'stack' : 'page stack'}>
+      {!embedded && (
+        <div className="row between">
+          <Link to="/" className="btn ghost sm"><ChevronLeft size={16} /> Inicio</Link>
+          {can('library.manage') && <Link to={`/marchas/${x.id}`} className="btn ghost sm">Ficha completa</Link>}
+        </div>
+      )}
       <div>
-        <h1 style={{ fontFamily: 'var(--font-display)' }}>{x.title}</h1>
+        <h1>{x.title}</h1>
         <div className="muted">{x.composer || ''}{mine.assignment ? `${x.composer ? ' · ' : ''}Tu parte: ${mine.assignment.instrument}${mine.assignment.voice ? ` ${mine.assignment.voice}` : ''}` : ''}</div>
       </div>
 
-      {mine.status !== 'ok' && <Notice kind="warn" title="Tu parte no está disponible">{mine.message}</Notice>}
+      {mine.status !== 'ok' && mine.assignment && <Notice kind="warn" title="Tu parte no está disponible">{mine.message}</Notice>}
+      {(published.length > 1 || (!mine.assignment && published.length > 0)) && (
+        <div className="row">
+          <span className="small muted">Voz:</span>
+          <select className="input" style={{ width: 'auto' }} value={scoreId ?? ''} onChange={(e) => { setVoice(e.target.value); stop(); }} aria-label="Voz">
+            {published.map((p) => <option key={p.id} value={p.id}>{p.label}{p.id === mine.score?.id ? ' (la tuya)' : ''}</option>)}
+          </select>
+          {can('scores.publish') && scoreId && <Link className="btn sm" to={`/score/${scoreId}`}><Pencil size={15} /> Editar notas</Link>}
+        </div>
+      )}
 
       {doc ? (
         <div className="card stack play-panel">
           <button className={`btn lg play-big ${playing ? '' : 'primary'}`} onClick={play} data-testid="play-march">
-            {playing ? <><Square size={24} /> Parar</> : <><Play size={26} /> Reproducir mi parte</>}
+            {playing ? <><Square size={24} /> Parar</> : <><Play size={26} /> {scoreId === mine.score?.id ? 'Reproducir mi parte' : 'Reproducir'}</>}
           </button>
           <p className="xs faint" style={{ textAlign: 'center', marginTop: -4 }}>¿No se oye? Sube el volumen del móvil y, en iPhone, quita el modo silencio.</p>
           <div className="row speed-row nowrap">
