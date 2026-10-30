@@ -7,7 +7,8 @@ services:
     plan: free
     region: frankfurt
     rootDir: estrella
-    buildCommand: npm ci && npm run build -w web
+    # NODE_ENV=production haría que npm omita las herramientas de compilación: se incluyen explícitamente
+    buildCommand: npm ci --include=dev && npm exec -w web -- vite build
     startCommand: npm start -w server
     healthCheckPath: /api/health
     envVars:
