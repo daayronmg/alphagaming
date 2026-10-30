@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { PDFDocument } from 'pdf-lib';
+import { validateBook, type BookEntry } from '../../../shared/book.ts';
 import { q, one, tx, audit, type Db } from '../db.ts';
 import { h, parse, HttpError } from '../lib/http.ts';
 import { requireAuth, requirePerm } from '../lib/auth.ts';
@@ -239,6 +241,69 @@ libraryRouter.post('/marchas/:id/parts', manage, upload.single('file'), h(async 
   hub.publish(`marcha:${req.params.id}`, { t: 'parts:changed', marchaId: req.params.id, partId: part.id, replaces: b.replaces_part_id ?? null });
   hub.toAll({ t: 'parts:changed', marchaId: req.params.id, partId: part.id, replaces: b.replaces_part_id ?? null });
   res.json(part);
+}));
+
+/**
+ * Libreto: un PDF con muchas marchas de un mismo instrumento y voz. La dirección revisa en el navegador
+ * qué páginas son de cada marcha; aquí se separa cada una en su propio PDF (el original no se modifica),
+ * se crea la marcha si no existe (se busca por título) y se añade —o se versiona— su partitura.
+ */
+libraryRouter.post('/import-book', manage, upload.single('file'), h(async (req, res) => {
+  if (!req.file) throw new HttpError(400, 'Falta el PDF del libreto.');
+  const b = parse(z.object({
+    label: z.string().min(1).max(120),
+    instrument_id: z.coerce.number().int(),
+    voice_id: z.coerce.number().int().optional().nullable(),
+    arrangement: z.string().max(120).optional(),
+    entries: z.string().transform((s, ctx) => {
+      try { return JSON.parse(s); } catch { ctx.addIssue({ code: 'custom', message: 'Lista de marchas no válida.' }); return z.NEVER; }
+    }).pipe(z.array(z.object({ title: z.string().trim().min(1).max(200), composer: z.string().trim().max(200).optional().default(''),
+      from: z.number().int().min(1), to: z.number().int().min(1) })).min(1).max(300)),
+  }), Object.fromEntries(Object.entries(req.body).filter(([, v]) => v !== '')));
+  if (b.voice_id) {
+    const ok = await one('select 1 from voices where id = $1 and instrument_id = $2', [b.voice_id, b.instrument_id]);
+    if (!ok) throw new HttpError(400, 'La voz no pertenece al instrumento indicado.');
+  } else if (!(await one('select 1 from instruments where id = $1', [b.instrument_id]))) throw new HttpError(400, 'Instrumento no válido.');
+  let src: PDFDocument;
+  try { src = await PDFDocument.load(req.file.buffer, { updateMetadata: false }); } catch { throw new HttpError(415, 'El archivo no es un PDF legible.'); }
+  const err = validateBook(b.entries, src.getPageCount());
+  if (err) throw new HttpError(400, err);
+
+  // se preparan los PDF antes de abrir la transacción
+  const pieces: { entry: BookEntry; buf: Buffer }[] = [];
+  for (const e of b.entries) {
+    const out = await PDFDocument.create();
+    const pages = await out.copyPages(src, Array.from({ length: e.to - e.from + 1 }, (_, i) => e.from - 1 + i));
+    pages.forEach((p) => out.addPage(p));
+    out.setTitle(e.title);
+    pieces.push({ entry: e, buf: Buffer.from(await out.save()) });
+  }
+  const results = await tx(async (c) => {
+    const out: { marcha_id: string; title: string; status: 'creada' | 'añadida' | 'nueva_version'; pages: number; replaces: string | null }[] = [];
+    for (const { entry: e, buf } of pieces) {
+      let m = await one<any>('select id, composer from marchas where not is_demo and unaccent_lower(title) = unaccent_lower($1) order by created_at limit 1', [e.title], c);
+      let status: 'creada' | 'añadida' | 'nueva_version' = 'añadida';
+      if (!m) {
+        m = await one<any>('insert into marchas(title, composer, created_by) values ($1,$2,$3) returning id', [e.title, e.composer || null, req.user!.id], c);
+        await q('insert into marcha_changes(marcha_id, user_id, summary) values ($1,$2,$3)', [m.id, req.user!.id, 'Marcha creada al importar un libreto'], c);
+        status = 'creada';
+      } else if (!m.composer && e.composer) await q('update marchas set composer = $2, updated_at = now() where id = $1', [m.id, e.composer], c);
+      const name = `${e.title} - ${b.label}.pdf`.replace(/[\\/:*?"<>|]/g, ' ');
+      const f = await storeFile(buf, name, req.user!.id, ['pdf'], c);
+      const old = await one<any>(`select id, version from parts where marcha_id = $1 and active and instrument_id = $2 and voice_id is not distinct from $3 for update`, [m.id, b.instrument_id, b.voice_id ?? null], c);
+      if (old) { await q('update parts set active = false where id = $1', [old.id], c); if (status !== 'creada') status = 'nueva_version'; }
+      await q(`insert into parts(marcha_id, instrument_id, voice_id, label, arrangement, file_id, page_count, version, replaces_part_id, created_by)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [m.id, b.instrument_id, b.voice_id ?? null, b.label, b.arrangement ?? null, f.id, e.to - e.from + 1, old ? old.version + 1 : 1, old?.id ?? null, req.user!.id], c);
+      await q('insert into marcha_changes(marcha_id, user_id, summary) values ($1,$2,$3)', [m.id, req.user!.id,
+        old ? `Partitura «${b.label}» sustituida desde un libreto (versión ${old.version + 1})` : `Partitura «${b.label}» añadida desde un libreto`], c);
+      out.push({ marcha_id: m.id, title: e.title, status, pages: e.to - e.from + 1, replaces: old?.id ?? null });
+    }
+    await audit(req.user!.id, 'import_book', 'library', null, { file: req.file!.originalname, label: b.label, count: out.length }, c);
+    return out;
+  });
+  for (const r of results) hub.toAll({ t: 'parts:changed', marchaId: r.marcha_id, replaces: r.replaces });
+  res.json({ results });
 }));
 
 libraryRouter.get('/parts/:id', h(async (req, res) => {

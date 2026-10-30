@@ -1,5 +1,6 @@
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import type { PageText } from '../../../shared/book';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -61,4 +62,25 @@ export function cropCanvas(canvas: HTMLCanvasElement, r: { x: number; y: number;
   out.width = Math.max(1, Math.round(w * canvas.width)); out.height = Math.max(1, Math.round(h * canvas.height));
   out.getContext('2d')!.drawImage(canvas, x * canvas.width, y * canvas.height, out.width, out.height, 0, 0, out.width, out.height);
   return new Promise((res) => out.toBlob(res, 'image/png'));
+}
+
+/** Textos de cada página de un PDF local, con su posición (y desde arriba) y tamaño de letra. */
+export async function readPdfText(file: File): Promise<PageText[]> {
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const out: PageText[] = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const vp = page.getViewport({ scale: 1 });
+    const tc = await page.getTextContent();
+    out.push({
+      width: vp.width, height: vp.height,
+      items: tc.items.filter((it): it is any => 'str' in it).map((it) => {
+        // se pasa a coordenadas de la página tal como se ve (incluye páginas giradas)
+        const [x, y] = vp.convertToViewportPoint(it.transform[4], it.transform[5]);
+        return { str: it.str, x, y, size: Math.hypot(it.transform[2], it.transform[3]) };
+      }),
+    });
+  }
+  await doc.destroy();
+  return out;
 }
