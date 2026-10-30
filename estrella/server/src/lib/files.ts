@@ -97,12 +97,32 @@ export function filePath(rel: string) {
 }
 
 /** Contenido de un archivo, esté en disco o dentro de la base de datos. */
+/**
+ * Caché en memoria de archivos guardados en la base de datos. Los archivos no cambian nunca (una versión
+ * nueva es un archivo nuevo), así que se pueden guardar sin caducidad. Con 100 músicos abriendo el mismo
+ * libreto a la vez, se lee una sola vez de la base de datos; las peticiones simultáneas comparten la lectura.
+ */
+const CACHE_MAX = Number(process.env.FILE_CACHE_MB || 96) * 1024 * 1024;
+const cache = new Map<string, Buffer>();
+const inflight = new Map<string, Promise<Buffer>>();
+let cached = 0;
+function remember(id: string, buf: Buffer) {
+  if (buf.length > CACHE_MAX / 4) return;
+  cache.set(id, buf); cached += buf.length;
+  for (const [k, v] of cache) { if (cached <= CACHE_MAX) break; cache.delete(k); cached -= v.length; }
+}
+
 export async function readFileData(f: { id: string; storage_path: string }): Promise<Buffer> {
-  if (f.storage_path === 'db') {
-    const r = await one<any>('select data from files where id = $1', [f.id]);
-    return r?.data ?? Buffer.alloc(0);
+  if (f.storage_path !== 'db') return fs.readFileSync(filePath(f.storage_path));
+  const hit = cache.get(f.id);
+  if (hit) { cache.delete(f.id); cache.set(f.id, hit); return hit; } // más reciente al final (LRU)
+  let p = inflight.get(f.id);
+  if (!p) {
+    p = one<any>('select data from files where id = $1', [f.id]).then((r) => { const b: Buffer = r?.data ?? Buffer.alloc(0); remember(f.id, b); return b; });
+    inflight.set(f.id, p);
+    p.finally(() => inflight.delete(f.id)).catch(() => {});
   }
-  return fs.readFileSync(filePath(f.storage_path));
+  return p;
 }
 
 export async function fileRow(id: string) {
