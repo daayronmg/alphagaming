@@ -5,6 +5,7 @@ services:
     name: estrella
     runtime: node
     plan: free
+    autoDeploy: true
     region: frankfurt
     rootDir: estrella
     # NODE_ENV=production haría que npm omita las herramientas de compilación: se incluyen explícitamente
