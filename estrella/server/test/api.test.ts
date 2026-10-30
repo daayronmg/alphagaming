@@ -174,3 +174,48 @@ test('archivos privados: validación por contenido y acceso restringido', async 
   assert.equal(sniff(Buffer.from('<html>hola</html>')), null);
   assert.equal(sniff(Buffer.from('MZ\x90\x00')), null); // ejecutable: rechazado
 });
+
+test('libreto: cada marcha se separa en su PDF y llega a la voz correcta', async () => {
+  const { PDFDocument } = await import('pdf-lib');
+  const doc = await PDFDocument.create();
+  for (let i = 0; i < 4; i++) doc.addPage([842, 595]);
+  const pdf = Buffer.from(await doc.save());
+  const e = await login('emilio@estrella.demo');
+  const a = await login('componente.a@estrella.demo'); // corneta 3ª
+  const b = await login('componente.b@estrella.demo'); // trompeta
+  const corneta = (await e('/org/structure')).data.flatMap((s: any) => s.instruments).find((i: any) => i.name === 'Corneta');
+  const c3 = corneta.voices.find((v: any) => v.name.startsWith('3'));
+  const cookie = async (email: string) => (await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ email, password: DEMO_PASSWORD }) })).headers.get('set-cookie')!.split(';')[0];
+  const send = async (email: string, entries: unknown) => {
+    const fd = new FormData();
+    fd.append('file', new Blob([pdf], { type: 'application/pdf' }), 'libreto.pdf');
+    fd.append('label', 'Corneta 3ª');
+    fd.append('instrument_id', String(corneta.id));
+    fd.append('voice_id', String(c3.id));
+    fd.append('entries', JSON.stringify(entries));
+    const r = await fetch(`${base}/library/import-book`, { method: 'POST', headers: { cookie: await cookie(email), 'x-estrella': '1' }, body: fd });
+    return { status: r.status, data: await r.json() };
+  };
+  const entries = [{ title: 'Marcha Libreto Uno', composer: 'Autor Uno', from: 1, to: 1 }, { title: 'Marcha Libreto Dos', composer: '', from: 2, to: 3 }];
+  assert.equal((await send('componente.a@estrella.demo', entries)).status, 403);
+  assert.equal((await send('emilio@estrella.demo', [{ title: 'X', from: 1, to: 2 }, { title: 'Y', from: 2, to: 2 }])).status, 400); // solapadas
+  assert.equal((await send('emilio@estrella.demo', [{ title: 'X', from: 4, to: 5 }])).status, 400); // fuera del PDF
+  const r1 = await send('emilio@estrella.demo', entries);
+  assert.equal(r1.status, 200);
+  assert.deepEqual(r1.data.results.map((r: any) => r.status), ['creada', 'creada']);
+  const dos = r1.data.results[1].marcha_id;
+  const ra = (await a(`/library/marchas/${dos}/my-part`)).data;
+  assert.equal(ra.status, 'ok');
+  assert.equal(ra.part.page_count, 2);
+  assert.equal((await b(`/library/marchas/${dos}/my-part`)).data.status, 'falta_parte');
+  const file = await fetch(`${base}/files/${ra.part.file_id}`, { headers: { cookie: await cookie('componente.a@estrella.demo') } });
+  assert.equal((await PDFDocument.load(Buffer.from(await file.arrayBuffer()))).getPageCount(), 2);
+  // reimportar con otro formato de título: misma marcha, nueva versión de la parte
+  const r2 = await send('emilio@estrella.demo', [{ title: 'marcha libreto dós', from: 4, to: 4 }]);
+  assert.equal(r2.data.results[0].marcha_id, dos);
+  assert.equal(r2.data.results[0].status, 'nueva_version');
+  const again = (await a(`/library/marchas/${dos}/my-part`)).data.part;
+  assert.equal(again.version, 2);
+  assert.equal(again.page_count, 1);
+  assert.equal((await e(`/library/marchas/${r1.data.results[0].marcha_id}`)).data.composer, 'Autor Uno');
+});

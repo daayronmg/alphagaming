@@ -68,3 +68,24 @@ test('dirección en directo: arranque programado, posición y bucle', async () =
   s = await applyCommand(s, { type: 'step', delta: 100 }, t0);
   assert.equal(s.measure, 24); // no supera el total de compases
 });
+
+test('libreto: detección de títulos y autores por página', async () => {
+  const { detectBook, validateBook } = await import('../../shared/book.ts');
+  const page = (items: [string, number, number, number][]) => ({ width: 842, height: 595, items: items.map(([str, x, y, size]) => ({ str, x, y, size })) });
+  const staff: [string, number, number, number][] = [['Corneta 3ª', 39, 90, 15], ['J', 100, 94, 17], ['w', 200, 90, 17], ['p', 120, 107, 9]];
+  const pages = [
+    page([['Semana Santa 2026', 61, 52, 11], ['1 ¡A esta es!', 347, 51, 36], ['Antonio Jesús Castaño López', 666, 57, 11], ['Manuel Alejandro González Cruz', 646, 69, 11], ...staff]),
+    page(staff), // continuación sin cabecera
+    page([['Semana Santa 2026', 35, 71, 11], ['Al cielo el Rey de Triana', 287, 42, 30], ['A Juan Pérez', 700, 60, 11], ['Rafael Vázquez Mateo', 576, 78, 11], ...staff]),
+    page([['Retreta Floreada', 267, 75, 36], ['V.25', 515, 75, 40], ...staff]),
+  ];
+  const book = detectBook(pages);
+  assert.deepEqual(book, [
+    { title: '¡A esta es!', composer: 'Antonio Jesús Castaño López / Manuel Alejandro González Cruz', from: 1, to: 2 },
+    { title: 'Al cielo el Rey de Triana', composer: 'Rafael Vázquez Mateo', from: 3, to: 3 },
+    { title: 'Retreta Floreada V.25', composer: '', from: 4, to: 4 },
+  ]);
+  assert.equal(validateBook(book, 4), null);
+  assert.match(validateBook([{ title: 'A', composer: '', from: 1, to: 2 }, { title: 'B', composer: '', from: 2, to: 2 }], 4)!, /solapa/);
+  assert.match(validateBook([{ title: ' ', composer: '', from: 1, to: 1 }], 4)!, /título/);
+});

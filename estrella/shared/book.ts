@@ -1,0 +1,69 @@
+/**
+ * Detección de marchas en un libreto PDF (varias marchas de un mismo instrumento y voz en un solo archivo).
+ * Trabaja con los textos de cada página (como los da pdf.js) y propone título y autor; la dirección
+ * siempre revisa la propuesta antes de importar. Si una página no tiene título se considera continuación.
+ */
+
+export interface TextItem { str: string; x: number; y: number; size: number } // y medido desde arriba
+export interface PageText { width: number; height: number; items: TextItem[] }
+export interface BookEntry { title: string; composer: string; from: number; to: number }
+
+// rótulos del libreto, dedicatorias y créditos que no son el autor
+const NOISE = /^(semana santa( \d{4})?|corneta|trompeta|tromb[oó]n|bombardino|caja|bombo|platos|percusi[oó]n|banda|arreglos?|adaptaci[oó]n|revisi[oó]n)\b/i;
+const DEDICATION = /^(a|al|para)\s|^\(/i;
+const clean = (s: string) => s.replace(/\s+/g, ' ').trim();
+// los símbolos musicales llegan como letras sueltas: un texto «de verdad» tiene al menos tres letras seguidas
+const isWords = (s: string) => /\p{L}{3}/u.test(s);
+
+export function detectPage(p: PageText): { title: string; composer: string } {
+  const head = p.items.filter((i) => i.str.trim() && i.y < p.height * 0.2);
+  const words = p.items.filter((i) => isWords(i.str));
+  if (!words.length) return { title: '', composer: '' };
+  // el título es el texto de mayor tamaño de la cabecera y destaca claramente sobre los demás rótulos
+  const anchor = head.filter((i) => isWords(i.str)).sort((a, b) => b.size - a.size)[0];
+  if (!anchor) return { title: '', composer: '' };
+  const sizes = words.filter((i) => i !== anchor).map((i) => i.size).sort((a, b) => a - b);
+  const median = sizes[Math.floor(sizes.length / 2)] ?? 0;
+  if (anchor.size < median * 1.5) return { title: '', composer: '' };
+  // se añaden los fragmentos grandes de la misma línea (número de orden, «V.25»…)
+  const titleItems = head.filter((i) => i === anchor || (Math.abs(i.y - anchor.y) < anchor.size * 0.5 && i.size >= anchor.size * 0.6)).sort((a, b) => a.x - b.x);
+  const title = clean(titleItems.map((i) => i.str).join(' '))
+    .replace(/^\d+\s*[.)-]?\s*/, '') // número de orden del libreto
+    .replace(/\s+\d+$/, '')
+    .replace(/"\s*([^"]*?)\s*"/g, '"$1"');
+  // autor: textos a la derecha de la cabecera; si ocupa dos líneas seguidas se unen
+  const right = head.filter((i) => !titleItems.includes(i) && i.x > p.width * 0.55 && i.size < anchor.size && isWords(i.str) && !NOISE.test(clean(i.str)) && !DEDICATION.test(clean(i.str)))
+    .sort((a, b) => a.y - b.y);
+  let composer = '';
+  if (right.length) {
+    const first = clean(right[0].str);
+    const next = right[1] && right[1].y - right[0].y < right[0].size * 1.8 ? clean(right[1].str) : '';
+    composer = !next || next === first ? first : /(,| y)$/.test(first) ? `${first} ${next}` : `${first} / ${next}`;
+  }
+  return { title: NOISE.test(title) ? '' : title, composer };
+}
+
+/** Propone una entrada por marcha: una página sin título se une a la marcha anterior. */
+export function detectBook(pages: PageText[]): BookEntry[] {
+  const out: BookEntry[] = [];
+  pages.forEach((p, i) => {
+    const d = detectPage(p);
+    const n = i + 1;
+    if (!d.title && out.length) out[out.length - 1].to = n;
+    else out.push({ title: d.title || `Página ${n}`, composer: d.composer, from: n, to: n });
+  });
+  return out;
+}
+
+/** Comprueba que las entradas cubren páginas válidas, sin solaparse. Devuelve el error o null. */
+export function validateBook(entries: BookEntry[], pageCount: number): string | null {
+  if (!entries.length) return 'No hay marchas que importar.';
+  let last = 0;
+  for (const e of [...entries].sort((a, b) => a.from - b.from)) {
+    if (!e.title.trim()) return `Falta el título de la marcha de la página ${e.from}.`;
+    if (!(e.from >= 1 && e.to >= e.from && e.to <= pageCount)) return `Páginas no válidas en «${e.title}».`;
+    if (e.from <= last) return `«${e.title}» se solapa con la marcha anterior.`;
+    last = e.to;
+  }
+  return null;
+}

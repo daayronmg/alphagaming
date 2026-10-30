@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Plus, Star, Music, FileText, Headphones, FileMusic, Folder } from '../components/icons';
+import { Search, Plus, Star, Music, FileText, Headphones, FileMusic, Folder, Upload } from '../components/icons';
 import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useLoad, Empty, Modal, Field, useToast, Spinner, ErrorBox } from '../components/ui';
@@ -22,7 +22,7 @@ export default function Library() {
     <div className="page">
       <div className="page-head">
         <div><div className="eyebrow">Repertorio</div><h1>Biblioteca musical</h1></div>
-        {can('library.manage') && <button className="btn primary" onClick={() => setCreating(true)}><Plus size={18} /> Nueva marcha</button>}
+        {can('library.manage') && <div className="row"><Link className="btn" to="/biblioteca/importar"><Upload size={18} /> Importar libreto</Link><button className="btn primary" onClick={() => setCreating(true)}><Plus size={18} /> Nueva marcha</button></div>}
       </div>
       <div className="card flat stack" style={{ marginBottom: 18 }}>
         <div className="row nowrap"><Search size={18} className="faint" /><input className="input" placeholder="Buscar por título o compositor…" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} aria-label="Buscar" /></div>
