@@ -17,6 +17,9 @@ export function useTheme(): ['dark' | 'light', () => void] {
   return [t, () => setT((x) => (x === 'dark' ? 'light' : 'dark'))];
 }
 
+/** Logotipo de la banda: el que suba la dirección o, si no, el escudo incluido con la aplicación. */
+export const logoUrl = (b: { logoFileId?: string }) => (b.logoFileId ? '/api/files/logo' : '/logo-256.webp');
+
 export function autoFollowEnabled() { return localStorage.getItem('estrella.autofollow') !== '0'; }
 
 function ConnBadge() {
@@ -119,7 +122,7 @@ export default function Layout() {
     <div className="app">
       <aside className="sidebar">
         <Link to="/" className="brand">
-          <div className="brand-mark">{branding.logoFileId ? <img src="/api/files/logo" alt="" /> : appName[0]}</div>
+          <div className="brand-mark"><img src={logoUrl(branding)} alt="" /></div>
           <div><div className="brand-name">{appName}</div><div className="brand-sub">{branding.bandName}</div></div>
         </Link>
         {visible.map((l) => {
@@ -153,10 +156,11 @@ export default function Layout() {
           </div>
         )}
         <header className="topbar">
-          <button className="btn icon ghost show-sm" onClick={() => setMore(true)} aria-label="Menú"><Menu size={20} /></button>
-          <div className="grow row" style={{ gap: 8 }}>
-            <span className="show-sm brand-name" style={{ fontSize: '.95rem' }}>{appName}</span>
-          </div>
+          <Link to="/" className="topbar-brand grow">
+            <img src={logoUrl(branding)} alt="" />
+            <span className="ellipsis"><b>{appName}</b><small>{branding.bandName}</small></span>
+          </Link>
+          <div className="grow hide-mobile" />
           <ConnBadge />
           <button className="btn icon ghost" onClick={toggleTheme} aria-label="Cambiar tema" title="Modo claro/oscuro">{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</button>
         </header>

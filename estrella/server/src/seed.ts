@@ -99,7 +99,7 @@ export async function seedDemo() {
   await ensureStructure();
   const I = await ids();
   await q(`insert into settings(key, value) values ('branding', $1) on conflict (key) do nothing`, [JSON.stringify({
-    appName: config.appName, bandName: 'Banda de Cornetas y Tambores Estrella de Málaga', accent: '#c9a227', instagram: 'https://www.instagram.com/bctestrellamlg/',
+    appName: config.appName, bandName: 'Banda de Cornetas y Tambores Estrella de Málaga', instagram: 'https://www.instagram.com/bctestrellamlg/',
   })]);
 
   const pw = hashPassword(DEMO_PASSWORD);

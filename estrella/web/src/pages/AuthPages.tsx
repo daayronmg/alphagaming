@@ -1,3 +1,4 @@
+import { logoUrl } from '../components/Layout';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { get, post } from '../lib/api';
@@ -11,8 +12,8 @@ function Shell({ children }: { children: ReactNode }) {
       <div className="auth-art">
         <div className="staff-lines" />
         <div style={{ position: 'relative' }}>
-          <div className="brand-mark" style={{ width: 64, height: 64, fontSize: 34, marginBottom: 22 }}>{branding.logoFileId ? <img src="/api/files/logo" alt="Logotipo de la banda" /> : (branding.appName ?? 'E')[0]}</div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.4rem, 5vw, 4rem)', fontWeight: 700, letterSpacing: '.12em', lineHeight: 1 }}>{branding.appName}</div>
+          <img src={logoUrl(branding)} alt="Escudo de la banda" style={{ width: 'clamp(110px, 22vw, 168px)', height: 'auto', marginBottom: 18, filter: 'drop-shadow(0 10px 18px rgba(0,0,0,.18))' }} />
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 5vw, 3.6rem)', fontWeight: 600, letterSpacing: '-.04em', lineHeight: 1 }}>{branding.appName}</div>
           <p style={{ marginTop: 12, opacity: .8, maxWidth: 440 }}>{branding.bandName}</p>
           <p style={{ marginTop: 6, opacity: .55, fontSize: '.85rem' }}>Ensayos, partituras, dirección en directo y academia. Acceso privado para componentes.</p>
         </div>

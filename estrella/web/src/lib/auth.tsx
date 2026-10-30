@@ -54,7 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.title = branding.appName || APP_NAME_DEFAULT;
-    if (branding.accent) document.documentElement.style.setProperty('--accent', branding.accent);
+    // el dorado era el color provisional anterior al escudo: con él se usan los colores de la banda
+    if (branding.accent && branding.accent.toLowerCase() !== '#c9a227') document.documentElement.style.setProperty('--accent', branding.accent);
+    else document.documentElement.style.removeProperty('--accent');
   }, [branding]);
 
   const can = useCallback((perm: string, sectionId?: number | null) => {
