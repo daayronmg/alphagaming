@@ -13,9 +13,8 @@ function Shell({ children }: { children: ReactNode }) {
         <div className="staff-lines" />
         <div style={{ position: 'relative' }}>
           <img src={logoUrl(branding)} alt="Escudo de la banda" style={{ width: 'clamp(84px, 18vw, 140px)', height: 'auto', marginBottom: 18, filter: 'drop-shadow(0 10px 22px rgba(0,0,0,.5))' }} />
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 5vw, 3.6rem)', fontWeight: 600, letterSpacing: '-.04em', lineHeight: 1 }}>{branding.appName}</div>
-          <p style={{ marginTop: 12, opacity: .8, maxWidth: 440 }}>{branding.bandName}</p>
-          <p style={{ marginTop: 6, opacity: .75, fontSize: '.85rem' }}>Ensayos, partituras, dirección en directo y academia. Acceso privado para componentes.</p>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 5vw, 3.4rem)', fontWeight: 600, letterSpacing: '-.04em', lineHeight: 1.05 }}>Componentes Estrella</div>
+          <p style={{ marginTop: 12, opacity: .85, maxWidth: 440 }}>{branding.bandName}</p>
         </div>
       </div>
       <div className="auth-form">{children}</div>
