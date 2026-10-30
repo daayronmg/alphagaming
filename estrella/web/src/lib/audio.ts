@@ -2,10 +2,46 @@
 import { midiOf, midiToFreq, noteQuarters, playOrder, type ScoreDoc } from '../../../shared/music';
 
 let ctx: AudioContext | null = null;
+let out: AudioNode | null = null;
+let keepAlive: HTMLAudioElement | null = null;
+
+/** WAV de silencio: mantenerlo sonando hace que el iPhone trate la página como reproductor de música (suena aunque esté en silencio). */
+function silentWavUrl(): string {
+  const rate = 8000, n = rate / 2, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const w = (o: number, t: string) => [...t].forEach((ch, i) => v.setUint8(o + i, ch.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+
+/** Prepara el audio en el mismo toque del usuario (requisito de los móviles). */
+export function unlockAudio() {
+  try { const s = (navigator as any).audioSession; if (s) s.type = 'playback'; } catch { /* */ }
+  if (!keepAlive) {
+    keepAlive = new Audio(silentWavUrl());
+    keepAlive.loop = true;
+    keepAlive.setAttribute('playsinline', '');
+  }
+  keepAlive.play().catch(() => {});
+  audioCtx();
+}
+
 export function audioCtx(): AudioContext {
   if (!ctx) ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  if (ctx.state === 'suspended') ctx.resume();
+  if (ctx.state === 'suspended' || (ctx.state as string) === 'interrupted') ctx.resume().catch(() => {});
   return ctx;
+}
+
+/** Salida general con compresor: más volumen sin distorsionar en altavoces de móvil. */
+function output(c: AudioContext): AudioNode {
+  if (!out) {
+    const comp = c.createDynamicsCompressor();
+    comp.threshold.value = -18; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.15;
+    const g = c.createGain(); g.gain.value = 1.6;
+    comp.connect(g); g.connect(c.destination);
+    out = comp;
+  }
+  return out;
 }
 
 /** Sonido sintético aproximado de metal (no imita una corneta real: sirve para estudiar alturas y ritmo). */
@@ -16,7 +52,7 @@ function brass(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: n
   const f = c.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 2;
   f.frequency.setValueAtTime(freq * 1.5, t); f.frequency.linearRampToValueAtTime(freq * 6, t + 0.05); f.frequency.linearRampToValueAtTime(freq * 3.5, t + Math.max(0.06, dur));
   const g = c.createGain();
-  const a = 0.025, rel = 0.06, peak = 0.16 * vel;
+  const a = 0.025, rel = 0.06, peak = 0.32 * vel;
   g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.setValueAtTime(peak * 0.85, t + Math.max(a, dur - rel)); g.gain.linearRampToValueAtTime(0.0001, t + dur);
   const mix = c.createGain(); mix.gain.value = 0.5;
   o1.connect(f); o2.connect(mix); mix.connect(f); f.connect(g); g.connect(dest);
@@ -71,7 +107,7 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
   onMeasure?: (n: number) => void; onNote?: (id: string | null) => void; onEnd?: () => void;
 }): ScorePlayback {
   const c = audioCtx();
-  const master = c.createGain(); master.gain.value = 1; master.connect(c.destination);
+  const master = c.createGain(); master.gain.value = 1; master.connect(output(c));
   const doc0 = parts[0].doc;
   const beatsPerMeasure = doc0.time[0];
   const beatQuarters = 4 / doc0.time[1];
