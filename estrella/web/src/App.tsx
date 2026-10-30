@@ -28,6 +28,8 @@ const MemberDetail = lazy(() => import('./pages/MemberDetail'));
 const ImportMembers = lazy(() => import('./pages/ImportMembers'));
 const ImportBook = lazy(() => import('./pages/ImportBook'));
 const PlayMarcha = lazy(() => import('./pages/PlayMarcha'));
+const LiveSimple = lazy(() => import('./pages/LiveSimple'));
+const DirectorSimple = lazy(() => import('./pages/DirectorSimple'));
 const Stats = lazy(() => import('./pages/Stats'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Admin = lazy(() => import('./pages/Admin'));
@@ -71,6 +73,8 @@ export default function App() {
             <Route path="biblioteca/importar" element={<ImportBook />} />
             <Route path="marchas/:id" element={<MarchaDetail />} />
             <Route path="tocar/:id" element={<PlayMarcha />} />
+            <Route path="en-directo" element={<LiveSimple />} />
+            <Route path="dirigir" element={<DirectorSimple />} />
             <Route path="partitura/:partId" element={<PartView />} />
             <Route path="score/:scoreId" element={<ScoreView />} />
             <Route path="directo" element={<LiveMember />} />
