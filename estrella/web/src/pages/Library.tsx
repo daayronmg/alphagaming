@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Plus, Star, Music, FileText, Headphones, FileMusic, Folder, Upload } from '../components/icons';
+import { Search, Plus, Star, Music, FileText, Headphones, FileMusic, Folder, Upload, Wand2 } from '../components/icons';
+import GenerateNotes from '../components/GenerateNotes';
 import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useLoad, Empty, Modal, Field, useToast, Spinner, ErrorBox } from '../components/ui';
@@ -16,13 +17,14 @@ export default function Library() {
   const struct = useLoad(() => get<any[]>('/org/structure'), []);
   const events = useLoad(() => get<any[]>('/events'), []);
   const [creating, setCreating] = useState(false);
+  const [notes, setNotes] = useState(false);
   const instruments = (struct.data ?? []).flatMap((s) => s.instruments);
 
   return (
     <div className="page">
       <div className="page-head">
         <div><div className="eyebrow">Repertorio</div><h1>Biblioteca musical</h1></div>
-        {can('library.manage') && <div className="row"><Link className="btn" to="/biblioteca/importar"><Upload size={18} /> Importar libreto</Link><button className="btn primary" onClick={() => setCreating(true)}><Plus size={18} /> Nueva marcha</button></div>}
+        {can('library.manage') && <div className="row">{can('scores.publish') && <button className="btn" onClick={() => setNotes(true)}><Wand2 size={18} /> Sacar notas de los PDF</button>}<Link className="btn" to="/biblioteca/importar"><Upload size={18} /> Importar libreto</Link><button className="btn primary" onClick={() => setCreating(true)}><Plus size={18} /> Nueva marcha</button></div>}
       </div>
       <div className="card flat stack" style={{ marginBottom: 18 }}>
         <div className="row nowrap"><Search size={18} className="faint" /><input className="input" placeholder="Buscar por título o compositor…" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} aria-label="Buscar" /></div>
@@ -41,7 +43,7 @@ export default function Library() {
       {list.data && !list.data.length && <Empty icon={<Music size={36} />} title="No hay marchas con esos criterios">{can('library.manage') ? 'Crea la primera marcha y sube sus partituras.' : 'La dirección todavía no ha subido repertorio.'}</Empty>}
       <div className="grid cols-3">
         {(list.data ?? []).map((m) => (
-          <Link key={m.id} to={`/marchas/${m.id}`} className="card hover stack sm">
+          <Link key={m.id} to={can('library.manage') ? `/marchas/${m.id}` : `/tocar/${m.id}`} className="card hover stack sm">
             <div className="row between nowrap">
               <h3 className="ellipsis" style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 600 }}>{m.title}</h3>
               {m.favorite && <Star size={16} fill="var(--accent)" color="var(--accent)" />}
@@ -62,6 +64,7 @@ export default function Library() {
           </Link>
         ))}
       </div>
+      {notes && <GenerateNotes onClose={() => { setNotes(false); list.reload(); }} />}
       {creating && <MarchaForm folders={meta.data?.folders ?? []} onClose={() => setCreating(false)} onSaved={(id) => { setCreating(false); toast({ kind: 'ok', text: 'Marcha creada' }); nav(`/marchas/${id}`); }} />}
     </div>
   );

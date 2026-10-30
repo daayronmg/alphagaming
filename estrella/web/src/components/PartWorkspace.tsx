@@ -237,7 +237,7 @@ export default function PartWorkspace({ partId, live, header, initialMeasure, in
 
       <div className="score-body">
         <div className="score-scroll" ref={scroller}>
-          <ScoreCanvas url={fileUrl(p.file_id)} kind={p.file_kind === 'image' ? 'image' : 'pdf'} zoom={zoom} tool={tool} color={color} width={width} symbol={symbol}
+          <ScoreCanvas url={fileUrl(p.file_id)} range={p.page_from ? [p.page_from, p.page_to] : null} kind={p.file_kind === 'image' ? 'image' : 'pdf'} zoom={zoom} tool={tool} color={color} width={width} symbol={symbol}
             annotations={visible} measureMap={measureMap} highlights={highlights} ink={anns.ink} selectedId={selected}
             doubtMarkers={show.doubts ? doubtList.map((d) => ({ id: d.id, page: d.page, rect: d.rect, label: d.text, mine: d.author_id === me?.id })) : []}
             onDraft={onDraft} onTextAt={(page, x, y) => setTextAt({ page, x, y })} penOnly={penOnly}

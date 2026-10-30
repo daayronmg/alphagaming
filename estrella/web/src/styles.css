@@ -328,3 +328,25 @@ textarea.input { min-height: 96px; resize: vertical; }
 .tuner-needle i { position: absolute; top: -10px; width: 4px; height: 26px; background: var(--text); border-radius: 4px; transition: left .12s; }
 .show-sm { display: none !important; }
 @media (max-width: 900px) { .show-sm { display: inline-flex !important; } .hide-sm { display: none; } }
+
+/* ===== Inicio sencillo y «Tocar» ===== */
+.home-logo { width: 72px; height: 72px; object-fit: contain; border-radius: 16px; background: var(--surface); padding: 6px; flex: none; }
+.big-action { display: flex; align-items: center; gap: 16px; border-width: 2px; }
+.big-action.live { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
+.big-action h2 { font-size: clamp(1.25rem, 2vw + .8rem, 1.7rem); margin-top: 2px; }
+.rsvp-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.rsvp-buttons .btn { justify-content: center; font-size: 1.2rem; min-height: 64px; font-weight: 700; }
+.rsvp-buttons .btn.yes.on, .rsvp-buttons .btn.yes.on:hover { background: var(--ok); border-color: var(--ok); color: #fff; }
+.rsvp-buttons .btn.no.on, .rsvp-buttons .btn.no.on:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+.rsvp-state { font-weight: 650; }
+.reason-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.march-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; margin: 0 -8px; }
+.march-row { display: flex; align-items: center; gap: 12px; padding: 12px 8px; border-radius: 12px; border-bottom: 1px solid var(--line); }
+.march-row:hover { background: var(--surface-2); }
+.march-title { font-weight: 650; }
+.play-dot { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); flex: none; }
+.play-big { width: 100%; justify-content: center; font-size: 1.3rem; min-height: 72px; font-weight: 750; }
+.play-panel { position: sticky; top: 8px; z-index: 5; }
+.speed-row input[type=range] { flex: 1; }
+.progress { height: 10px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--accent); transition: width .3s; }

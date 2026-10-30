@@ -1,126 +1,168 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, Radio, Music, GraduationCap, Flame, ChevronRight, Megaphone, Plus, MessageCircleQuestion, Baton, Check, X } from '../components/icons';
+import { CalendarDays, Radio, Music, ChevronRight, Plus, MessageCircleQuestion, Baton, Check, X, Search, Play, MapPin, Clock } from '../components/icons';
 import { useAuth } from '../lib/auth';
 import { get, put } from '../lib/api';
-import { useLoad, Notice, useToast } from '../components/ui';
-import { fmtDate, fmtTime, EVENT_TYPES, assignmentLabel, fmtRelative } from '../lib/format';
+import { useLoad, Notice, useToast, Modal } from '../components/ui';
+import { fmtTime, EVENT_TYPES, assignmentLabel, fmtRelative } from '../lib/format';
 import { useRealtime } from '../lib/realtime';
 
+const REASONS = ['Trabajo', 'Estoy enfermo/a', 'Estudios', 'Viaje', 'Asunto familiar'];
+
+/** Inicio: lo esencial a un toque — ¿hay ensayo?, ¿voy?, ¿qué marcha ha puesto el director?, elegir marcha y tocar. */
 export default function Home() {
   const { me, can, branding } = useAuth();
   const toast = useToast();
   const events = useLoad(() => get<any[]>(`/events?from=${new Date(Date.now() - 3 * 3600_000).toISOString()}`), []);
   const live = useLoad(() => get<any[]>('/live/active'), []);
   const anns = useLoad(() => get<any[]>('/comms/announcements'), []);
-  const stats = useLoad(() => get('/academy/me/stats'), []);
-  const lib = useLoad(() => get<any[]>('/library/marchas?fav=1'), []);
-  useRealtime((m) => { if (m.t === 'events:changed') events.reload(); if (m.t.startsWith('live:')) live.reload(); if (m.t === 'announcement') anns.reload(); }, []);
+  const marchas = useLoad(() => get<any[]>('/library/marchas'), []);
+  const [q, setQ] = useState('');
+  const [absent, setAbsent] = useState<any | null>(null);
+  const [other, setOther] = useState('');
+  useRealtime((m) => {
+    if (m.t === 'events:changed') events.reload();
+    if (m.t.startsWith('live:')) live.reload();
+    if (m.t === 'announcement') anns.reload();
+    if (m.t === 'parts:changed' || m.t === 'score:published') marchas.reload();
+  }, []);
   if (!me) return null;
   const director = can('live.direct');
-  const upcoming = (events.data ?? []).filter((e) => e.status !== 'cancelado' && e.convoked).slice(0, 4);
-  const nextWithRep = upcoming.find((e) => e.repertoire_count > 0);
+  const upcoming = (events.data ?? []).filter((e) => e.status === 'programado' && e.convoked);
+  const next = upcoming[0];
+  const later = upcoming.slice(1, 4);
   const session = live.data?.[0];
-  const hour = new Date().getHours();
-  const hello = hour < 13 ? 'Buenos días' : hour < 21 ? 'Buenas tardes' : 'Buenas noches';
+  const list = (marchas.data ?? []).filter((m) => !m.is_demo || (marchas.data ?? []).every((x) => x.is_demo))
+    .filter((m) => !q || norm(m.title).includes(norm(q)) || norm(m.composer ?? '').includes(norm(q)));
 
-  const rsvp = async (id: string, response: 'asistire' | 'no_asistire') => {
-    let reason: string | null = null;
-    if (response === 'no_asistire') { reason = prompt('Indica el motivo de la ausencia (lo verá la dirección):'); if (!reason) return; }
-    try { await put(`/events/${id}/rsvp`, { response, reason }); events.reload(); toast({ kind: 'ok', text: 'Respuesta registrada' }); } catch (e) { toast({ kind: 'error', text: (e as Error).message }); }
+  const answer = async (e: any, response: 'asistire' | 'no_asistire', reason?: string) => {
+    try {
+      await put(`/events/${e.id}/rsvp`, { response, reason: reason ?? null });
+      events.reload(); setAbsent(null); setOther('');
+      toast({ kind: 'ok', text: response === 'asistire' ? '¡Apuntado! Te esperamos.' : 'Hecho. La dirección ya lo sabe.' });
+    } catch (x) { toast({ kind: 'error', text: (x as Error).message }); }
   };
 
   return (
-    <div className="page stack lg">
-      <section className="hero">
-        <div className="eyebrow" style={{ color: 'var(--accent)', fontSize: '.75rem', letterSpacing: '.16em', textTransform: 'uppercase', fontWeight: 650 }}>{branding.bandName}</div>
-        <h1 style={{ marginTop: 6 }}>{hello}, {me.name.split(' ')[0]}</h1>
-        <div className="row" style={{ marginTop: 12 }}>
-          {me.role === 'director' && <span className="badge accent">Dirección musical</span>}
-          {me.assignments.map((a) => <span key={a.id} className={`badge ${a.is_default ? 'accent' : ''}`}><Music size={12} /> {assignmentLabel(a)}</span>)}
-          {!me.assignments.length && me.role !== 'director' && <span className="badge warn">Sin instrumento asignado</span>}
-        </div>
-        {director && (
-          <div className="row" style={{ marginTop: 18 }}>
-            <Link className="btn primary" to={session ? `/direccion/${session.id}` : '/direccion'}><Baton size={18} /> {session ? 'Volver a la consola' : 'Dirigir ensayo'}</Link>
-            <Link className="btn" to="/calendario?nuevo=1"><Plus size={18} /> Nuevo evento</Link>
-            <Link className="btn" to="/dudas"><MessageCircleQuestion size={18} /> Bandeja de dudas</Link>
+    <div className="page stack lg home-simple">
+      <section className="hero row nowrap" style={{ gap: 16 }}>
+        {branding.logoFileId && <img src="/api/files/logo" alt={branding.bandName} className="home-logo" />}
+        <div className="grow">
+          <div className="eyebrow" style={{ color: 'var(--accent)' }}>{branding.bandName}</div>
+          <h1 style={{ marginTop: 4 }}>Hola, {me.name.split(' ')[0]}</h1>
+          <div className="row" style={{ marginTop: 8 }}>
+            {me.assignments.map((a) => <span key={a.id} className={`badge ${a.is_default ? 'accent' : ''}`}><Music size={12} /> {assignmentLabel(a)}</span>)}
+            {!me.assignments.length && me.role !== 'director' && <span className="badge warn">Aún no tienes instrumento asignado</span>}
           </div>
-        )}
+        </div>
       </section>
 
-      {session && !director && (
-        <Link to={`/directo/${session.id}`} className="card hover row" style={{ borderColor: 'var(--accent)' }}>
+      {/* 1. El director está dirigiendo: directo a la marcha */}
+      {session && (
+        <Link to={director ? `/direccion/${session.id}` : `/directo/${session.id}`} className="card big-action live" data-testid="home-live">
           <span className="dot-status on" />
-          <div className="grow"><h3>Ensayo en directo</h3><div className="muted small">{session.state?.marchaTitle ? `Trabajando: ${session.state.marchaTitle}` : 'Esperando a que la dirección envíe una marcha'}</div></div>
-          <span className="btn primary"><Radio size={18} /> Unirme</span>
+          <div className="grow">
+            <div className="eyebrow">Ensayo en directo</div>
+            <h2>{session.state?.marchaTitle ? session.state.marchaTitle : 'El director va a poner una marcha'}</h2>
+            <div className="small muted">{session.state?.marchaTitle ? 'El director ha puesto esta marcha. Toca para ver tu partitura.' : 'Entra y te saldrá sola en cuanto la elija.'}</div>
+          </div>
+          <span className="btn primary lg"><Radio size={20} /> {director ? 'Consola' : 'Entrar'}</span>
         </Link>
+      )}
+
+      {/* 2. Próximo ensayo o actuación: voy / no voy */}
+      {next ? (
+        <div className="card stack" data-testid="home-next">
+          <div className="row between">
+            <div>
+              <div className="eyebrow">{isToday(next.starts_at) ? 'Hoy' : 'Próximo'} · {EVENT_TYPES[next.type]}</div>
+              <h2 style={{ marginTop: 4 }}>{next.title}</h2>
+              <div className="row small muted" style={{ marginTop: 6, gap: 14 }}>
+                <span className="row" style={{ gap: 4 }}><CalendarDays size={15} /> {bigDate(next.starts_at)}</span>
+                <span className="row" style={{ gap: 4 }}><Clock size={15} /> {next.call_at ? `citación ${fmtTime(next.call_at)}` : fmtTime(next.starts_at)}</span>
+                {next.location && <span className="row" style={{ gap: 4 }}><MapPin size={15} /> {next.location}</span>}
+              </div>
+              {next.last_minute && <div className="small" style={{ color: 'var(--danger)', fontWeight: 650, marginTop: 6 }}>⚠ {next.last_minute}</div>}
+            </div>
+            <Link to={`/eventos/${next.id}`} className="btn ghost sm">Detalles <ChevronRight size={16} /></Link>
+          </div>
+          {next.status === 'programado' && (
+            <>
+              {next.my_rsvp && <div className={`rsvp-state ${next.my_rsvp}`}>{next.my_rsvp === 'asistire' ? '✅ Has dicho que vas' : '❌ Has dicho que no vas'}</div>}
+              <div className="rsvp-buttons">
+                <button className={`btn lg yes ${next.my_rsvp === 'asistire' ? 'on' : ''}`} onClick={() => answer(next, 'asistire')} data-testid="rsvp-yes"><Check size={22} /> Voy</button>
+                <button className={`btn lg no ${next.my_rsvp === 'no_asistire' ? 'on' : ''}`} onClick={() => setAbsent(next)} data-testid="rsvp-no"><X size={22} /> No voy</button>
+              </div>
+            </>
+          )}
+          {later.length > 0 && (
+            <div className="stack sm">
+              <div className="xs faint">Después</div>
+              {later.map((e) => (
+                <Link key={e.id} to={`/eventos/${e.id}`} className="list-item" style={{ padding: 8 }}>
+                  <span className="small grow"><strong>{bigDate(e.starts_at)}</strong> · {e.title}</span>
+                  {e.my_rsvp ? <span className={`badge ${e.my_rsvp === 'asistire' ? 'ok' : 'danger'}`}>{e.my_rsvp === 'asistire' ? 'Voy' : 'No voy'}</span> : <span className="badge warn">Sin responder</span>}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="card"><div className="row"><CalendarDays size={20} className="faint" /><span className="muted">No hay ensayos ni actuaciones próximas.</span></div></div>
       )}
 
       {(anns.data ?? []).filter((a) => !a.read).slice(0, 2).map((a) => (
         <Notice key={a.id} kind={a.urgent ? 'danger' : 'info'} title={a.title}>{a.body} <Link to="/avisos" className="faint">· {fmtRelative(a.created_at)}</Link></Notice>
       ))}
 
-      <div className="grid cols-2">
-        <div className="card">
-          <div className="card-title"><h3><CalendarDays size={18} /> Próximas convocatorias</h3><Link to="/calendario" className="btn ghost sm">Calendario <ChevronRight size={16} /></Link></div>
-          {!upcoming.length && <p className="muted small">No tienes convocatorias próximas.</p>}
-          <div className="stack sm">
-            {upcoming.map((e) => (
-              <div key={e.id} className="list-item" style={{ padding: 10 }}>
-                <div style={{ textAlign: 'center', minWidth: 52 }}><div className="xs faint">{fmtDate(e.starts_at).split(' ')[0]}</div><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, lineHeight: 1 }}>{new Date(e.starts_at).getDate()}</div></div>
-                <Link to={`/eventos/${e.id}`} className="grow">
-                  <div style={{ fontWeight: 650 }}>{e.title}</div>
-                  <div className="xs muted">{EVENT_TYPES[e.type]} · {e.call_at ? `convocatoria ${fmtTime(e.call_at)}` : fmtTime(e.starts_at)} · {e.location ?? ''}</div>
-                  {e.last_minute && <div className="xs" style={{ color: 'var(--danger)', fontWeight: 650 }}>⚠ {e.last_minute}</div>}
-                </Link>
-                {e.status === 'programado' && (e.my_rsvp
-                  ? <span className={`badge ${e.my_rsvp === 'asistire' ? 'ok' : 'danger'}`}>{e.my_rsvp === 'asistire' ? 'Asistiré' : 'No asistiré'}</span>
-                  : <div className="row" style={{ gap: 4 }}>
-                      <button className="btn sm icon" title="Asistiré" onClick={() => rsvp(e.id, 'asistire')}><Check size={16} /></button>
-                      <button className="btn sm icon" title="No asistiré" onClick={() => rsvp(e.id, 'no_asistire')}><X size={16} /></button>
-                    </div>)}
-              </div>
-            ))}
-          </div>
+      {me.role === 'director' && !branding.logoFileId && (
+        <Notice kind="warn" title="Falta el logo de la banda">Súbelo en <Link to="/admin">Administración → Logotipo</Link> y saldrá en la entrada, en el menú y aquí arriba.</Notice>
+      )}
+
+      {director && (
+        <div className="row">
+          <Link className="btn primary" to={session ? `/direccion/${session.id}` : '/direccion'}><Baton size={18} /> {session ? 'Volver a la consola' : 'Dirigir ensayo'}</Link>
+          <Link className="btn" to="/calendario?nuevo=1"><Plus size={18} /> Nuevo ensayo</Link>
+          <Link className="btn" to="/dudas"><MessageCircleQuestion size={18} /> Dudas</Link>
         </div>
+      )}
 
-        <div className="card">
-          <div className="card-title"><h3><GraduationCap size={18} /> Mi estudio</h3><Link to="/academia" className="btn ghost sm">Academia <ChevronRight size={16} /></Link></div>
-          <div className="grid cols-3" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-            <div className="stat"><span className="v" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Flame size={22} color="var(--accent)" />{stats.data?.streak ?? 0}</span><span className="l">días de racha</span></div>
-            <div className="stat"><span className="v">{stats.data?.lessons?.completed ?? 0}</span><span className="l">lecciones</span></div>
-            <div className="stat"><span className="v">{stats.data?.totals?.answers ? Math.round((stats.data.totals.correct / stats.data.totals.answers) * 100) : 0}%</span><span className="l">aciertos</span></div>
-          </div>
-          {stats.data?.weak?.length > 0 && <p className="small muted" style={{ marginTop: 14 }}>Para repasar: {stats.data.weak.slice(0, 4).map((w: any) => w.item).join(', ')}</p>}
-          <div className="row" style={{ marginTop: 14 }}>
-            <Link className="btn sm" to="/academia/entrenamiento">Entrenar lectura</Link>
-            <Link className="btn sm" to="/academia/herramientas">Afinador y metrónomo</Link>
-          </div>
-        </div>
-
-        {nextWithRep && (
-          <div className="card">
-            <div className="card-title"><h3><Music size={18} /> Repertorio del próximo ensayo</h3></div>
-            <Link to={`/eventos/${nextWithRep.id}`} className="muted small">{nextWithRep.title} · {fmtDate(nextWithRep.starts_at)}</Link>
-            <RepertoireList eventId={nextWithRep.id} />
-          </div>
-        )}
-
-        <div className="card">
-          <div className="card-title"><h3><Megaphone size={18} /> Favoritas</h3><Link to="/biblioteca" className="btn ghost sm">Biblioteca <ChevronRight size={16} /></Link></div>
-          {!(lib.data ?? []).length && <p className="muted small">Marca marchas como favoritas para tenerlas a mano.</p>}
-          {(lib.data ?? []).slice(0, 5).map((m) => <Link key={m.id} to={`/marchas/${m.id}`} className="list-item" style={{ padding: 8 }}><Music size={16} /><span className="grow">{m.title}</span><ChevronRight size={16} /></Link>)}
+      {/* 3. Elegir una marcha y tocar */}
+      <div className="card stack">
+        <div className="card-title"><h3><Music size={18} /> Mis marchas</h3><span className="xs faint">{list.length}</span></div>
+        <div className="row nowrap"><Search size={18} className="faint" /><input className="input" placeholder="Busca una marcha…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar marcha" /></div>
+        {marchas.data && !list.length && <p className="muted small">{q ? 'No hay ninguna marcha con ese nombre.' : 'Todavía no hay marchas. La dirección las sube desde la Biblioteca.'}</p>}
+        <div className="march-list">
+          {list.slice(0, q ? 60 : 200).map((m) => (
+            <Link key={m.id} to={`/tocar/${m.id}`} className="march-row" data-testid="march-row">
+              <span className="play-dot"><Play size={16} /></span>
+              <span className="grow"><span className="march-title">{m.title}</span>{m.composer && <span className="xs faint"> · {m.composer}</span>}</span>
+              {m.scores > 0 && <span className="badge ok xs" title="Se puede escuchar">♪</span>}
+              <ChevronRight size={16} className="faint" />
+            </Link>
+          ))}
         </div>
       </div>
+
+      {absent && (
+        <Modal title="¿Por qué no puedes ir?" onClose={() => setAbsent(null)}>
+          <div className="stack">
+            <div className="reason-grid">{REASONS.map((r) => <button key={r} className="btn lg" onClick={() => answer(absent, 'no_asistire', r)}>{r}</button>)}</div>
+            <div className="row nowrap"><input className="input" placeholder="Otro motivo…" value={other} onChange={(e) => setOther(e.target.value)} /><button className="btn primary" disabled={!other.trim()} onClick={() => answer(absent, 'no_asistire', other.trim())}>Enviar</button></div>
+            <p className="xs faint">Solo lo ve la dirección.</p>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
 
-function RepertoireList({ eventId }: { eventId: string }) {
-  const ev = useLoad(() => get(`/events/${eventId}`), [eventId]);
-  return (
-    <div className="stack sm" style={{ marginTop: 10 }}>
-      {(ev.data?.repertoire ?? []).map((m: any) => <Link key={m.id} to={`/marchas/${m.id}`} className="list-item" style={{ padding: 8 }}><Music size={16} /><span className="grow">{m.title}</span><span className="badge">Mi parte <ChevronRight size={12} /></span></Link>)}
-    </div>
-  );
+const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
+function bigDate(iso: string) {
+  const d = new Date(iso);
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  if (isToday(iso)) return 'Hoy';
+  if (d.toDateString() === tomorrow.toDateString()) return 'Mañana';
+  return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 }

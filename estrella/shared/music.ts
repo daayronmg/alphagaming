@@ -16,6 +16,8 @@ export interface Note {
   alter?: number;
   dur: Dur;
   dots?: number;
+  /** nota de tresillo: dura 2/3 de su figura */
+  triplet?: boolean;
   tie?: boolean;
   artic?: Articulation[];
   dyn?: Dynamic;
@@ -30,6 +32,8 @@ export interface Measure {
   mark?: string;
   repeatStart?: boolean;
   repeatEnd?: boolean;
+  /** casilla de repetición (1ª o 2ª vez) */
+  volta?: number;
 }
 
 export interface ScoreDoc {
@@ -58,11 +62,37 @@ export function uid(): string {
   return 'x' + Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export function noteQuarters(n: Pick<Note, 'dur' | 'dots'>): number {
-  const base = DUR_QUARTERS[n.dur];
+export function noteQuarters(n: Pick<Note, 'dur' | 'dots' | 'triplet'>): number {
+  const base = DUR_QUARTERS[n.dur] * (n.triplet ? 2 / 3 : 1);
   if (n.dots === 1) return base * 1.5;
   if (n.dots === 2) return base * 1.75;
   return base;
+}
+
+/**
+ * Orden real de interpretación con repeticiones: |: … :| se toca dos veces y, en la segunda,
+ * se salta la casilla de 1ª vez. Devuelve los compases en el orden en que suenan.
+ */
+export function playOrder(measures: Measure[]): Measure[] {
+  const out: Measure[] = [];
+  let start = 0;
+  const done = new Set<number>();
+  for (let i = 0; i < measures.length; i++) {
+    const m = measures[i];
+    if (m.repeatStart) start = i;
+    out.push(m);
+    if (m.repeatEnd && !done.has(i)) {
+      done.add(i);
+      for (let k = start; k <= i; k++) {
+        const r = measures[k];
+        // segunda vuelta: se omiten los compases de 1ª vez
+        if (r.volta === 1) continue;
+        out.push(r);
+      }
+      start = i + 1;
+    }
+  }
+  return out;
 }
 export function measureCapacity(time: [number, number]): number {
   return (time[0] * 4) / time[1];

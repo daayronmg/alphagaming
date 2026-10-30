@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Upload, CheckCircle2, Trash2, ArrowUpToLine } from '../components/icons';
+import { Upload, CheckCircle2, Trash2, ArrowUpToLine, Wand2 } from '../components/icons';
+import GenerateNotes from '../components/GenerateNotes';
 import { get, upload } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { readPdfText } from '../lib/pdf';
@@ -25,6 +26,7 @@ export default function ImportBook() {
   const [reading, setReading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<any[] | null>(null);
+  const [notes, setNotes] = useState(false);
 
   const instruments = (struct.data ?? []).flatMap((s) => s.instruments);
   const existing = useMemo(() => new Map((marchas.data ?? []).filter((m) => !m.is_demo).map((m) => [norm(m.title), m])), [marchas.data]);
@@ -57,6 +59,7 @@ export default function ImportBook() {
     fd.append('file', file);
     fd.append('label', label || autoLabel);
     fd.append('instrument_id', String(iv.instrument_id));
+    fd.append('page_count', String(pageCount));
     if (iv.voice_id) fd.append('voice_id', String(iv.voice_id));
     fd.append('entries', JSON.stringify(entries.map((e) => ({ ...e, title: e.title.trim(), composer: e.composer.trim() }))));
     try {
@@ -80,7 +83,8 @@ export default function ImportBook() {
           <div className="table-wrap"><table className="table"><thead><tr><th>Marcha</th><th>Páginas</th><th>Resultado</th></tr></thead>
             <tbody>{done.map((r) => <tr key={r.marcha_id}><td><Link to={`/marchas/${r.marcha_id}`}>{r.title}</Link></td><td>{r.pages}</td><td><span className={`badge ${r.status === 'creada' ? 'ok' : 'info'}`}>{STATUS[r.status]}</span></td></tr>)}</tbody></table></div>
           <p className="xs muted">Para que el directo pueda seguir los compases, marca el mapa de compases de cada parte desde su ficha cuando lo necesites.</p>
-          <div className="row"><Link className="btn primary" to="/biblioteca">Ir a la biblioteca</Link><button className="btn" onClick={() => { setDone(null); pick(null); }}>Importar otro libreto</button></div>
+          <Notice kind="info" title="¿Quieres que se puedan escuchar?">ESTRELLA puede leer las notas de estos PDF para que cada músico pulse «Reproducir» y oiga su parte con el nombre de cada nota.</Notice>
+          <div className="row"><button className="btn primary" onClick={() => setNotes(true)}><Wand2 size={16} /> Sacar las notas ahora</button><Link className="btn" to="/biblioteca">Ir a la biblioteca</Link><button className="btn" onClick={() => { setDone(null); pick(null); }}>Importar otro libreto</button></div>
         </div>
       ) : (
         <>
@@ -123,6 +127,7 @@ export default function ImportBook() {
           )}
         </>
       )}
+      {notes && <GenerateNotes auto onClose={() => setNotes(false)} />}
     </div>
   );
 }
