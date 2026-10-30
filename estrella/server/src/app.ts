@@ -1,3 +1,5 @@
+import compression from 'compression';
+import { precompress, servePrecompressed } from './lib/precompress.ts';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import fs from 'node:fs';
@@ -35,6 +37,8 @@ export function createApp() {
   app.use(cookieParser());
   app.use('/api', authMiddleware, csrfGuard);
   app.get('/api/health', (_req, res) => res.json({ ok: true, app: config.appName, time: Date.now() }));
+  // respuestas JSON de la API comprimidas (los PDF y audios ya van comprimidos o se cachean en el móvil)
+  app.use('/api', compression({ threshold: 1024, level: 6, filter: (req, res) => !req.path.startsWith('/files') && compression.filter(req, res) }));
   app.use('/api/auth', authRouter);
   app.use('/api/org', orgRouter);
   app.use('/api/members', membersRouter);
@@ -54,6 +58,9 @@ export function createApp() {
 
   // Interfaz compilada (producción): un solo servidor para API, WebSocket y PWA
   if (fs.existsSync(path.join(config.webDist, 'index.html'))) {
+    const cacheFor = (p: string) => (/sw\.js$|index\.html$|manifest/.test(p) ? 'no-cache' : /\/assets\//.test(p) ? 'public, max-age=31536000, immutable' : 'public, max-age=3600');
+    precompress(config.webDist).catch((e) => console.error('[compresión]', e));
+    app.use(servePrecompressed(config.webDist, cacheFor));
     app.use(express.static(config.webDist, { index: false, maxAge: '1h', setHeaders: (res, p) => {
       if (/sw\.js$|index\.html$|manifest/.test(p)) res.setHeader('Cache-Control', 'no-cache');
       else if (/\/assets\//.test(p)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');

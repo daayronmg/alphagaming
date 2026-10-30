@@ -5,6 +5,7 @@ import { q, one, tx, audit, type Db } from '../db.ts';
 import { h, parse, HttpError } from '../lib/http.ts';
 import {
   requireAuth, requirePerm, can, sectionsWith, isStaff, hashPassword, randomToken, sha256, GLOBAL_PERMISSIONS,
+  forgetSession, forgetUser,
 } from '../lib/auth.ts';
 import { upload } from '../lib/files.ts';
 import { parseCsv, toCsv, norm } from '../lib/csv.ts';
@@ -178,6 +179,7 @@ membersRouter.put('/:id', requirePerm('members.manage'), h(async (req, res) => {
       left_at = case when $5 = 'baja' then coalesce(left_at, current_date) when $5 is not null then null else left_at end
     where id = $1`, [req.params.id, b.name ?? null, b.email ?? null, b.role ?? null, b.status ?? null, b.joined_at ?? null, b.phone ?? null, b.permissions ?? null]);
   if (b.status && b.status !== 'active') await q('delete from sessions where user_id = $1', [req.params.id]);
+  forgetUser(req.params.id);
   await audit(req.user!.id, 'update', 'user', req.params.id, b);
   hub.toUser(req.params.id, { t: 'me:changed' });
   res.json({ ok: true });
