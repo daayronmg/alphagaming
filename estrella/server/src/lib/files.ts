@@ -37,14 +37,17 @@ export async function storeFile(buf: Buffer, originalName: string, ownerId: stri
   if (!allowed.includes(s.kind)) throw new HttpError(415, `Tipo de archivo no permitido aquí (${s.kind}). Se admite: ${allowed.join(', ')}.`);
   const id = crypto.randomUUID();
   const sha = crypto.createHash('sha256').update(buf).digest('hex');
-  const rel = path.join(id.slice(0, 2), id);
-  const abs = path.join(config.storageDir, rel);
-  fs.mkdirSync(path.dirname(abs), { recursive: true });
-  fs.writeFileSync(abs, buf, { mode: 0o600 });
   const name = path.basename(originalName || 'archivo').slice(0, 180);
+  let rel = 'db';
+  if (config.storageMode === 'disk') {
+    rel = path.join(id.slice(0, 2), id);
+    const abs = path.join(config.storageDir, rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, buf, { mode: 0o600 });
+  }
   const row = await one<any>(
-    'insert into files(id, owner_id, kind, mime, original_name, size, sha256, storage_path) values ($1,$2,$3,$4,$5,$6,$7,$8) returning id, kind, mime, original_name, size',
-    [id, ownerId, s.kind, s.mime, name, buf.length, sha, rel], db,
+    'insert into files(id, owner_id, kind, mime, original_name, size, sha256, storage_path, data) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id, kind, mime, original_name, size',
+    [id, ownerId, s.kind, s.mime, name, buf.length, sha, rel, config.storageMode === 'db' ? buf : null], db,
   );
   return row as { id: string; kind: FileKind; mime: string; original_name: string; size: number };
 }
@@ -93,8 +96,17 @@ export function filePath(rel: string) {
   return path.join(config.storageDir, rel);
 }
 
+/** Contenido de un archivo, esté en disco o dentro de la base de datos. */
+export async function readFileData(f: { id: string; storage_path: string }): Promise<Buffer> {
+  if (f.storage_path === 'db') {
+    const r = await one<any>('select data from files where id = $1', [f.id]);
+    return r?.data ?? Buffer.alloc(0);
+  }
+  return fs.readFileSync(filePath(f.storage_path));
+}
+
 export async function fileRow(id: string) {
-  return one<any>('select * from files where id = $1', [id]);
+  return one<any>('select id, owner_id, kind, mime, original_name, size, sha256, storage_path, created_at from files where id = $1', [id]);
 }
 
 export async function deleteFileIfOrphan(id: string) {
@@ -102,5 +114,5 @@ export async function deleteFileIfOrphan(id: string) {
   if (used.length) return;
   const f = await fileRow(id);
   if (!f) return;
-  try { await q('delete from files where id = $1', [id]); fs.rmSync(filePath(f.storage_path), { force: true }); } catch { /* referenciado por otra tabla */ }
+  try { await q('delete from files where id = $1', [id]); if (f.storage_path !== 'db') fs.rmSync(filePath(f.storage_path), { force: true }); } catch { /* referenciado por otra tabla */ }
 }

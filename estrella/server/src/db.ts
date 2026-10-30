@@ -4,7 +4,13 @@ import { config } from './config.ts';
 pg.types.setTypeParser(1082, (v) => v); // date como texto YYYY-MM-DD
 pg.types.setTypeParser(20, (v) => Number(v)); // bigint → number
 
-export const pool = new pg.Pool({ connectionString: config.databaseUrl, max: 15 });
+// Conexiones remotas (Supabase, etc.) requieren SSL
+const remote = !/localhost|127\.0\.0\.1|@db:/.test(config.databaseUrl);
+export const pool = new pg.Pool({
+  connectionString: config.databaseUrl.replace(/[?&]sslmode=[^&]*/, ''),
+  max: Number(process.env.DB_POOL_MAX || 10),
+  ssl: remote || process.env.PGSSL === '1' ? { rejectUnauthorized: false } : undefined,
+});
 
 export type Db = pg.Pool | pg.PoolClient;
 

@@ -1,0 +1,31 @@
+# Despliegue gratuito de ESTRELLA en Render (servidor) + Supabase (base de datos).
+# En Render: New → Blueprint → elige este repositorio. Te pedirá DATABASE_URL y DB_PASSWORD.
+services:
+  - type: web
+    name: estrella
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: estrella
+    buildCommand: npm ci && npm run build -w web
+    startCommand: npm start -w server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: NODE_ENV
+        value: production
+      - key: STORAGE_MODE
+        value: db
+      - key: SEED_DEMO
+        value: "1"
+      - key: DB_USER
+        value: estrella_app
+      - key: DB_POOL_MAX
+        value: "5"
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

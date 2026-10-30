@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { q, one, tx, audit } from '../db.ts';
 import { h, parse, HttpError } from '../lib/http.ts';
 import { requireAuth, requirePerm, can } from '../lib/auth.ts';
-import { upload, storeFile, fileRow, filePath, canAccessFile } from '../lib/files.ts';
+import { upload, storeFile, fileRow, readFileData, canAccessFile } from '../lib/files.ts';
 import { config } from '../config.ts';
 import { hub } from '../realtime.ts';
 import { validateScore, diffScores, type ScoreDoc } from '../../../shared/music.ts';
@@ -146,11 +146,11 @@ scoresRouter.post('/omr/:partId', publisher, h(async (req, res) => {
   if (!config.audiverisPath) {
     throw new HttpError(501, 'El reconocimiento automático (OMR) no está configurado en este servidor. Instala Audiveris y define AUDIVERIS_PATH, o importa un MusicXML exportado desde MuseScore/Sibelius/Finale, o transcribe la parte en el editor.');
   }
-  const part = await one<any>('select p.*, f.storage_path, f.kind from parts p join files f on f.id = p.file_id where p.id = $1', [req.params.partId]);
+  const part = await one<any>('select p.*, f.id as fid, f.storage_path, f.kind from parts p join files f on f.id = p.file_id where p.id = $1', [req.params.partId]);
   if (!part) throw new HttpError(404, 'Partitura no encontrada.');
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'omr-'));
   const input = path.join(out, part.kind === 'pdf' ? 'entrada.pdf' : 'entrada.png');
-  fs.copyFileSync(filePath(part.storage_path), input);
+  fs.writeFileSync(input, await readFileData({ id: part.fid, storage_path: part.storage_path }));
   const code: number = await new Promise((resolve) => {
     const p = spawn(config.audiverisPath, ['-batch', '-export', '-output', out, input], { stdio: 'ignore' });
     const t = setTimeout(() => p.kill('SIGKILL'), 5 * 60_000);
@@ -175,5 +175,5 @@ scoresRouter.post('/omr/:partId', publisher, h(async (req, res) => {
 scoresRouter.get('/source/:fileId', h(async (req, res) => {
   const f = await fileRow(req.params.fileId);
   if (!f || f.kind !== 'musicxml' || !(await canAccessFile(req.user!, f.id))) throw new HttpError(404, 'Archivo no encontrado.');
-  res.type('application/xml').send(fs.readFileSync(filePath(f.storage_path)));
+  res.type('application/xml').send(await readFileData(f));
 }));
