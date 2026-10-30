@@ -1,0 +1,68 @@
+# Copia de seguridad semanal de la base de datos de ESTRELLA (Supabase «estrella-banda»).
+# Guarda un volcado cifrado como artefacto del workflow durante 90 días (13 copias).
+# El repositorio es público: el volcado SIEMPRE se cifra; sin BACKUP_PASSPHRASE el job falla.
+#
+# Secretos (Settings → Secrets and variables → Actions):
+#   ESTRELLA_DATABASE_URL  cadena «Session pooler» de Supabase (la misma DATABASE_URL de Render)
+#   BACKUP_PASSPHRASE      contraseña larga para cifrar; guárdala aparte, sin ella no se puede restaurar
+#
+# Restaurar: ver estrella/README.md, sección «Copia de seguridad».
+name: Copia de seguridad ESTRELLA
+
+on:
+  schedule:
+    - cron: '17 3 * * 1' # lunes 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: estrella-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Comprobar secretos
+        env:
+          DB: ${{ secrets.ESTRELLA_DATABASE_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          [ -n "$DB" ] || { echo "::error::Falta el secreto ESTRELLA_DATABASE_URL"; exit 1; }
+          [ -n "$PASS" ] || { echo "::error::Falta el secreto BACKUP_PASSPHRASE"; exit 1; }
+
+      - name: Instalar pg_dump 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+      - name: Volcar y cifrar
+        env:
+          DB: ${{ secrets.ESTRELLA_DATABASE_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          # la app admite la cadena de Supabase con [YOUR-PASSWORD] ya sustituida; aquí debe ir completa
+          name="estrella-$(date -u +%Y-%m-%d)"
+          /usr/lib/postgresql/17/bin/pg_dump "$DB" --schema=public --format=custom --no-owner --no-privileges --file="$name.dump"
+          /usr/lib/postgresql/17/bin/pg_restore --list "$name.dump" | grep -c "TABLE DATA" | xargs echo "Tablas con datos:"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PASS" --symmetric --cipher-algo AES256 --output "$name.dump.gpg" "$name.dump"
+          shred -u "$name.dump"
+          ls -lh "$name.dump.gpg"
+          echo "NAME=$name" >> "$GITHUB_ENV"
+
+      - name: Guardar copia
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}.dump.gpg
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error

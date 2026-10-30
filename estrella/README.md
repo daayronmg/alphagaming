@@ -242,6 +242,22 @@ Resultado verificado sobre el build de producción:
 - **Permisos en servidor:** todos los permisos se comprueban en el servidor, no solo en la interfaz. Las pruebas E y G lo verifican.
 - **Métricas:** solo con fines organizativos y de estudio. La interfaz advierte de que no miden la calidad musical.
 
+### Copia de seguridad
+Cada lunes, el workflow `.github/workflows/estrella-backup.yml` vuelca el esquema `public` de Supabase con `pg_dump`. El volcado incluye usuarios, marchas, partituras y archivos. Se cifra con AES-256 y se guarda 90 días como artefacto de GitHub Actions. Es gratis: ocupa unos pocos MB.
+- **Secretos del repositorio:**
+  - `ESTRELLA_DATABASE_URL`: la misma `DATABASE_URL` de Render, con la contraseña incluida.
+  - `BACKUP_PASSPHRASE`: una contraseña larga. Guárdala fuera de GitHub, porque sin ella la copia no se puede abrir. El repositorio es público y por eso la copia va siempre cifrada.
+- **Copia manual:** en Actions, abre «Copia de seguridad ESTRELLA» y pulsa «Run workflow».
+- **Si falla:** GitHub envía un correo al dueño del repositorio.
+- **Restaurar:** descarga el artefacto, descomprime el zip y ejecuta:
+  ```bash
+  gpg --decrypt estrella-AAAA-MM-DD.dump.gpg > estrella.dump
+  ```
+  ```bash
+  pg_restore --clean --if-exists --no-owner --no-privileges -d "$DATABASE_URL" estrella.dump
+  ```
+  `--clean` sustituye los datos actuales por los de la copia.
+
 ## 8. Fases
 - **Fase 1:** ✅ completa.
 - **Fase 2:** ✅ completa, salvo el OMR, que depende de Audiveris.
