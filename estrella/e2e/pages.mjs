@@ -14,7 +14,7 @@ for (const [email, vp, tag] of [['emilio@estrella.demo', { width: 1280, height: 
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('response', (r) => { if (r.url().includes('/api/') && r.status() >= 500) errs.push(`HTTP ${r.status()} ${r.url()}`); });
   await p.goto(`${BASE}/login`);
-  await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Estrella2026demo');
+  await p.fill('input[name=usuario]', email); await p.fill('input[type=password]', 'Estrella2026demo');
   await p.click('button:has-text("Entrar")'); await p.waitForURL((u) => !u.pathname.startsWith('/login'));
   const api = (path) => p.evaluate(async (path) => (await fetch('/api' + path)).json(), path);
   const marcha = (await api('/library/marchas?q=demostraci')).find((m) => m.title.includes('(ESTRELLA)'));

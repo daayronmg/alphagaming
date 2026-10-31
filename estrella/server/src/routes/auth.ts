@@ -13,12 +13,27 @@ import { userAssignments } from './members.ts';
 
 export const authRouter = Router();
 
+/** Últimas 9 cifras de un teléfono español (quita +34 / 0034, espacios y guiones). */
+export function phoneKey(v: string): string | null {
+  const d = v.replace(/\D/g, '');
+  return d.length >= 9 ? d.slice(-9) : null;
+}
+
+async function findLoginUser(login: string) {
+  if (login.includes('@')) return one<any>('select id, password_hash, status from users where lower(email) = lower($1)', [login]);
+  const k = phoneKey(login);
+  if (!k) return null;
+  const rows = await q<any>(`select id, password_hash, status from users where right(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), 9) = $1 limit 2`, [k]);
+  return rows.length === 1 ? rows[0] : null; // un número repetido en dos fichas no sirve para entrar
+}
+
 authRouter.post('/login', h(async (req, res) => {
-  const { email, password } = parse(z.object({ email: z.string().email().max(200), password: z.string().max(200) }), req.body);
+  // `email` admite el correo o el número de teléfono de la ficha
+  const { email, password } = parse(z.object({ email: z.string().trim().min(3).max(200), password: z.string().max(200) }), req.body);
   const key = `${req.ip}|${email.toLowerCase()}`;
   if (loginRateLimited(key)) throw new HttpError(429, 'Demasiados intentos. Espera unos minutos.');
-  const u = await one<any>('select id, password_hash, status from users where lower(email) = lower($1)', [email]);
-  if (!u || !verifyPassword(password, u.password_hash)) throw new HttpError(401, 'Correo o contraseña incorrectos.');
+  const u = await findLoginUser(email);
+  if (!u || !verifyPassword(password, u.password_hash)) throw new HttpError(401, 'Usuario o contraseña incorrectos.');
   if (u.status !== 'active') throw new HttpError(403, 'Tu cuenta no está activa. Contacta con la dirección.');
   clearLoginAttempts(key);
   await createSession(res, u.id, req.get('user-agent'));
