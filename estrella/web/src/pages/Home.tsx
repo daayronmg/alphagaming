@@ -1,7 +1,7 @@
 import { logoUrl } from '../components/Layout';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, Radio, Music, ChevronRight, Baton, Check, X, Search, Play, MapPin, Clock, CalendarPlus } from '../components/icons';
+import { CalendarDays, Radio, Music, ChevronRight, Baton, Check, X, Search, Play, MapPin, Clock, CalendarPlus, Upload, BarChart3 } from '../components/icons';
 import { useAuth } from '../lib/auth';
 import { get, put, post } from '../lib/api';
 import { useLoad, Notice, useToast, Modal, Field } from '../components/ui';
@@ -67,6 +67,14 @@ export default function Home() {
           <Link className="director-tile dark" to="/dirigir" data-testid="direct-rehearsal">
             <Baton size={28} /><b>{session ? 'Seguir dirigiendo' : 'Dirigir ensayo'}</b><span>Tocas una marcha y a todos les sale al momento.</span>
           </Link>
+          {can('library.manage') && (
+            <Link className="director-tile" to="/biblioteca/importar" data-testid="upload-marchas">
+              <Upload size={28} /><b>Subir marchas</b><span>Sube el PDF de una voz: la app separa cada marcha y saca las notas.</span>
+            </Link>
+          )}
+          <Link className="director-tile" to="/estadisticas" data-testid="attendance-stats">
+            <BarChart3 size={28} /><b>Asistencia</b><span>Recuento de cada componente: asistencias, retrasos y faltas.</span>
+          </Link>
         </div>
       )}
 
@@ -108,6 +116,7 @@ export default function Home() {
               </div>
             </>
           )}
+          {director && <RsvpSummary eventId={next.id} />}
           {later.length > 0 && (
             <div className="stack sm">
               <div className="xs faint">Después</div>
@@ -162,6 +171,32 @@ export default function Home() {
 }
 
 const greeting = () => { const h = new Date().getHours(); return h < 13 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches'; };
+/** Para la dirección: quién va, quién no (con su motivo) y quién no ha contestado al próximo ensayo. */
+function RsvpSummary({ eventId }: { eventId: string }) {
+  const ev = useLoad(() => get<any>(`/events/${eventId}`), [eventId]);
+  useRealtime((m) => { if (m.t === 'rsvp' && m.eventId === eventId) ev.reload(); }, [eventId]);
+  const roster: any[] = ev.data?.roster ?? [];
+  if (!roster.length) return null;
+  const yes = roster.filter((r) => r.rsvp?.response === 'asistire');
+  const no = roster.filter((r) => r.rsvp?.response === 'no_asistire');
+  const pending = roster.filter((r) => !r.rsvp);
+  return (
+    <div className="stack sm" data-testid="rsvp-summary">
+      <div className="row" style={{ gap: 8 }}>
+        <span className="badge ok">{yes.length} van</span>
+        <span className="badge danger">{no.length} no van</span>
+        <span className="badge warn">{pending.length} sin responder</span>
+      </div>
+      {no.length > 0 && (
+        <div className="stack sm">
+          {no.map((r) => <div key={r.id} className="small"><strong>{r.name}</strong> <span className="muted">· {r.rsvp.reason || 'sin motivo'}</span></div>)}
+        </div>
+      )}
+      {pending.length > 0 && <div className="xs faint">Sin responder: {pending.map((r) => r.name.split(' ')[0]).join(', ')}</div>}
+    </div>
+  );
+}
+
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
 function bigDate(iso: string) {
