@@ -26,7 +26,7 @@ async function session(email, viewport, label) {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`[${label}] ${e.message}`));
   await page.goto(`${BASE}/login`);
-  await page.fill('input[type=email]', email);
+  await page.fill('input[name=usuario]', email);
   await page.fill('input[type=password]', PW);
   await page.click('button:has-text("Entrar")');
   await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 10000 });

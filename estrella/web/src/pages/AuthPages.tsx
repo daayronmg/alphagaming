@@ -41,7 +41,7 @@ export function Login() {
       <form className="card stack" onSubmit={submit}>
         <div><h2>Iniciar sesión</h2><p className="muted small">Usa la cuenta que te ha facilitado la dirección.</p></div>
         {err && <Notice kind="danger">{err}</Notice>}
-        <Field label="Correo electrónico"><input className="input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
+        <Field label="Correo o teléfono"><input className="input" name="usuario" type="text" inputMode="email" autoCapitalize="none" autoCorrect="off" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
         <Field label="Contraseña"><input className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
         <button className="btn primary lg" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
         <div className="row between small"><Link className="muted" to="/recuperar">¿Has olvidado la contraseña?</Link><Link className="muted" to="/registro">Tengo una invitación</Link></div>

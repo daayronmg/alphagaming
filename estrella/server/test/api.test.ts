@@ -40,6 +40,15 @@ test('sin sesión no hay acceso; sin cabecera anti-CSRF no hay mutaciones', asyn
   assert.equal(r.status, 403);
 });
 
+test('se puede entrar con el teléfono de la ficha, escrito de cualquier forma', async () => {
+  await pool.query(`update users set phone = '+34 600 11 22 33' where email = 'componente.b@estrella.demo'`);
+  const try_ = (u: string) => fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ email: u, password: DEMO_PASSWORD }) }).then((r) => r.status);
+  for (const u of ['600112233', '+34600112233', '0034 600-11-22-33', '600 11 22 33']) assert.equal(await try_(u), 200, u);
+  assert.equal(await try_('600112234'), 401);
+  assert.equal(await try_('12345'), 401);
+  await pool.query(`update users set phone = null where email = 'componente.b@estrella.demo'`);
+});
+
 test('asignación automática: cada componente recibe su parte y nunca otra voz', async () => {
   const a = await login('componente.a@estrella.demo');
   const b = await login('componente.b@estrella.demo');

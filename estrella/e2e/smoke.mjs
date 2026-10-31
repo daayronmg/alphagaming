@@ -9,7 +9,7 @@ const login = async (email, viewport) => {
   p.on('console', (m) => { if (m.type() === 'error') console.log(`[${email}] console:`, m.text()); });
   p.on('pageerror', (e) => console.log(`[${email}] pageerror:`, e.message));
   await p.goto(`${BASE}/login`);
-  await p.fill('input[type=email]', email);
+  await p.fill('input[name=usuario]', email);
   await p.fill('input[type=password]', 'Estrella2026demo');
   await p.click('button:has-text("Entrar")');
   await p.waitForURL((u) => !u.pathname.startsWith('/login'));
