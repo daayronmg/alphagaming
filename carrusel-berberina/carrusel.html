@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#111;font-family:'Inter',sans-serif;display:flex;flex-direction:column;gap:40px;padding:40px;align-items:center}
+.s{width:1080px;height:1920px;position:relative;overflow:hidden;color:#fff}
+.ph{position:absolute;inset:0;background:url(assets/2.jpg) center/cover no-repeat}
+.shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.75) 0%,rgba(0,0,0,.05) 38%,rgba(0,0,0,.05) 60%,rgba(0,0,0,.85) 100%)}
+.pill{display:inline-block;align-self:flex-start;background:#E8746F;color:#fff;font-weight:800;font-size:34px;padding:14px 30px;border-radius:60px;letter-spacing:1px}
+.big{font-family:'Inter Display','Inter';font-weight:900;line-height:1.02;letter-spacing:-2px}
+.swipe{position:absolute;bottom:90px;left:0;right:0;text-align:center;font-weight:800;font-size:42px;letter-spacing:2px}
+.num{position:absolute;top:70px;right:70px;font-weight:800;font-size:30px;opacity:.6}
+.light{background:#F6E9E6;color:#1E2140}
+.coral{background:#E8746F;color:#fff}
+.navy{background:#1E2140;color:#fff}
+.pad{position:absolute;inset:0;padding:160px 90px;display:flex;flex-direction:column}
+.hl{background:linear-gradient(transparent 58%,#E8746F 58%);padding:0 6px}
+.hl2{background:linear-gradient(transparent 58%,#F6E9E6 58%);color:#1E2140;padding:0 6px}
+.card{background:#fff;border-radius:40px;padding:44px 50px;font-size:44px;font-weight:600;line-height:1.3;color:#1E2140;box-shadow:0 20px 60px rgba(0,0,0,.12)}
+.card b{color:#E8746F}
+.prod{display:block;margin:0 auto;border-radius:30px}
+.small{font-size:30px;opacity:.75;line-height:1.4}
+</style></head><body>
+
+<!-- 1 GANCHO -->
+<div class="s" id="s1">
+  <div class="ph" style="background-position:42% center"></div><div class="shade" style="background:linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(0,0,0,0) 40%,rgba(0,0,0,.9) 78%,rgba(0,0,0,.95) 100%)"></div>
+  <div style="position:absolute;bottom:200px;left:80px;right:80px">
+    <div class="pill">NADIE SE DIO CUENTA</div>
+    <div class="big" style="font-size:112px;margin-top:40px;text-shadow:0 6px 30px rgba(0,0,0,.5)">Lo que llevaba <span class="hl">escondido</span> debajo del vestido esta noche&hellip;</div>
+  </div>
+  <div class="swipe">DESLIZA &rarr;</div>
+</div>
+
+<!-- 2 REVEAL -->
+<div class="s light" id="s2"><div class="num">2/8</div>
+  <div class="pad" style="justify-content:center">
+    <div class="big" style="font-size:150px">Era <span class="hl">esto.</span></div>
+    <img class="prod" src="assets/1.png" style="width:760px;margin-top:70px;transform:rotate(-4deg)">
+    <div style="font-size:52px;font-weight:700;margin-top:70px;line-height:1.25">Un parche de berberina.<br>Me lo pego por la mañana y me olvido.</div>
+  </div>
+</div>
+
+<!-- 2b PARA QUE SIRVE -->
+<div class="s coral" id="s3"><div class="num">3/8</div>
+  <div class="pad">
+    <div class="pill" style="background:#1E2140">¿PARA QUÉ SIRVE?</div>
+    <div class="big" style="font-size:116px;margin-top:40px">Para apoyar tu <span class="hl2">metabolismo</span>. Sin pastillas.</div>
+    <div style="display:flex;flex-direction:column;gap:34px;margin-top:90px">
+      <div class="card"><b>Apoya un metabolismo saludable</b> mientras haces tu vida</div>
+      <div class="card">Pensado para ayudarte con los <b>antojos de dulce</b></div>
+      <div class="card">Te acompaña <b>todo el día</b> (y toda la noche)</div>
+    </div>
+    <div class="small" style="margin-top:auto">Según la marca. Complemento alimenticio, no medicamento.</div>
+  </div>
+</div>
+
+<!-- 3 QUE ES -->
+<div class="s navy" id="s4"><div class="num">4/8</div>
+  <div class="pad">
+    <div class="pill">¿QUÉ ES LA BERBERINA?</div>
+    <div class="big" style="font-size:104px;margin-top:50px">Un compuesto de plantas que se usa <span class="hl">desde hace siglos.</span></div>
+    <div style="display:flex;flex-direction:column;gap:30px;margin-top:80px">
+      <div class="card"><b>Berberina</b> &mdash; extraída de plantas como el agracejo</div>
+      <div class="card"><b>+ Granada</b> &mdash; extracto de la fruta</div>
+      <div class="card"><b>+ Canela</b> &mdash; el clásico de la cocina</div>
+    </div>
+    <div class="small" style="margin-top:auto">Ingredientes según la marca (Kind Patches).</div>
+  </div>
+</div>
+
+<!-- 4 POR QUE PARCHE -->
+<div class="s coral" id="s5"><div class="num">5/8</div>
+  <div class="pad">
+    <div class="big" style="font-size:120px">¿Por qué en <span class="hl2">parche</span> y no en pastilla?</div>
+    <div style="display:flex;flex-direction:column;gap:34px;margin-top:100px">
+      <div class="card">Cero pastillas, <b>cero sabor amargo</b></div>
+      <div class="card"><b>Liberación continua</b> durante el día</div>
+      <div class="card">Pequeño y discreto: <b>no se ve</b> bajo la ropa</div>
+      <div class="card"><b>Vegano</b> &middot; 30 parches = 1 mes</div>
+    </div>
+  </div>
+</div>
+
+<!-- 5 RUTINA -->
+<div class="s light" id="s6"><div class="num">6/8</div>
+  <div class="pad">
+    <div class="pill">MI RUTINA</div>
+    <div class="big" style="font-size:120px;margin-top:40px">10 segundos. <span class="hl">Literal.</span></div>
+    <div style="display:flex;flex-direction:column;gap:34px;margin-top:90px">
+      <div class="card"><b>01</b>&nbsp; Piel limpia y seca, zona sin vello</div>
+      <div class="card"><b>02</b>&nbsp; Lo pego (brazo, cadera o espalda baja)</div>
+      <div class="card"><b>03</b>&nbsp; Sigo con mi día. Y con mi noche.</div>
+    </div>
+    <div class="small" style="margin-top:auto">Sigue siempre las instrucciones del envase.</div>
+  </div>
+</div>
+
+<!-- 6 HONESTIDAD -->
+<div class="s navy" id="s7"><div class="num">7/8</div>
+  <div class="pad">
+    <div class="big" style="font-size:112px">Lo que <span class="hl">nadie</span> te dice:</div>
+    <div style="display:flex;flex-direction:column;gap:34px;margin-top:90px">
+      <div class="card">No es magia ni un medicamento. <b>Es un complemento.</b></div>
+      <div class="card">Funciona como <b>parte de tus hábitos</b>: comida, movimiento y descanso.</div>
+      <div class="card">¿Tomas medicación, estás embarazada o en lactancia? <b>Consúltalo antes.</b></div>
+    </div>
+  </div>
+</div>
+
+<!-- 7 CTA -->
+<div class="s" id="s8">
+  <div class="ph" style="background-position:38% center;filter:brightness(.55)"></div>
+  <div class="pad" style="justify-content:flex-end;padding-bottom:180px">
+    <img class="prod" src="assets/1.png" style="width:470px;margin:0 0 60px 0;transform:rotate(5deg);box-shadow:0 30px 80px rgba(0,0,0,.6)">
+    <div class="big" style="font-size:108px">Tu nuevo <span class="hl">secreto</span> está en la cesta.</div>
+    <div style="font-size:48px;font-weight:700;margin-top:40px">30 parches &middot; 1 mes &middot; vegano</div>
+    <div style="margin-top:60px"><span class="pill" style="font-size:44px;padding:22px 44px">TOCA LA CESTA NARANJA &darr;</span></div>
+  </div>
+</div>
+</body></html>
