@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './config.ts';
 import { authMiddleware, csrfGuard } from './lib/auth.ts';
+import { rsvpLinkRouter } from './lib/rsvpMail.ts';
 import { errorHandler } from './lib/http.ts';
 import { authRouter } from './routes/auth.ts';
 import { orgRouter } from './routes/org.ts';
@@ -36,6 +37,8 @@ export function createApp() {
   });
   app.use(express.json({ limit: '4mb' }));
   app.use(cookieParser());
+  // botones «Voy / No voy» de la convocatoria por correo: enlace firmado, sin sesión (va antes del control CSRF)
+  app.use('/api/rsvp', rsvpLinkRouter);
   app.use('/api', authMiddleware, csrfGuard);
   // ?db=1 también consulta la base de datos: un vigilante externo que la llame cada pocos minutos mantiene
   // despiertos el servidor y Supabase (el plan gratuito se pausa tras una semana sin uso) y avisa si falla
