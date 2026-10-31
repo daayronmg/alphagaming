@@ -6,6 +6,7 @@ import { h, parse, HttpError } from '../lib/http.ts';
 import { requireAuth, requirePerm, can, sectionsWith, isStaff, randomToken, type AuthUser } from '../lib/auth.ts';
 import { hub } from '../realtime.ts';
 import { toCsv } from '../lib/csv.ts';
+import { sendRsvpInvites } from '../lib/rsvpMail.ts';
 
 export const eventsRouter = Router();
 eventsRouter.use(requireAuth);
@@ -82,6 +83,7 @@ const eventBody = z.object({
   responsible_id: z.string().uuid().nullable().optional(), section_ids: z.array(z.number().int()).default([]),
   repertoire: z.array(z.string().uuid()).max(60).optional(),
   status: z.enum(['programado', 'cancelado', 'finalizado']).optional(),
+  notify: z.boolean().optional(), // false: no mandar la convocatoria por correo
 });
 
 eventsRouter.post('/', manage, h(async (req, res) => {
@@ -95,6 +97,8 @@ eventsRouter.post('/', manage, h(async (req, res) => {
   });
   hub.toAll({ t: 'events:changed', eventId: e.id });
   res.json(e);
+  // convocatoria por correo a cada componente (en segundo plano: no hace esperar a la dirección)
+  if (b.notify !== false) sendRsvpInvites(e.id).catch((x) => console.error('[convocatoria]', x));
 }));
 
 eventsRouter.put('/:id', manage, h(async (req, res) => {

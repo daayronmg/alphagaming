@@ -49,6 +49,33 @@ test('se puede entrar con el teléfono de la ficha, escrito de cualquier forma',
   await pool.query(`update users set phone = null where email = 'componente.b@estrella.demo'`);
 });
 
+test('convocatoria por correo: los botones Voy / No voy confirman sin sesión y no se pueden falsificar', async () => {
+  const { rsvpToken } = await import('../src/lib/rsvpMail.ts');
+  const emilio = await login('emilio@estrella.demo');
+  const ev = await emilio('/events', 'POST', { type: 'ensayo', title: 'Ensayo de prueba (correo)', starts_at: new Date(Date.now() + 3 * 864e5).toISOString(), section_ids: [], notify: false });
+  assert.equal(ev.status, 200);
+  const uid = (await pool.query(`select id from users where email = 'componente.a@estrella.demo'`)).rows[0].id;
+  const yes = await rsvpToken(ev.data.id, uid, 'asistire');
+  const page = await fetch(`${base}/rsvp/${yes}`);
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /Sí, voy/);
+  // abrir el enlace no confirma (los antivirus de correo lo visitan solos)
+  assert.equal((await pool.query('select count(*)::int as n from event_rsvp where event_id = $1', [ev.data.id])).rows[0].n, 0);
+  const ok = await fetch(`${base}/rsvp/${yes}`, { method: 'POST' });
+  assert.equal(ok.status, 200);
+  assert.equal((await pool.query('select response from event_rsvp where event_id = $1 and user_id = $2', [ev.data.id, uid])).rows[0].response, 'asistire');
+  const no = await rsvpToken(ev.data.id, uid, 'no_asistire');
+  const form = (b: Record<string, string>) => fetch(`${base}/rsvp/${no}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(b) });
+  assert.equal((await form({})).status, 400);
+  assert.equal((await form({ reason: 'otro', other: 'Boda de mi prima' })).status, 200);
+  const r = (await pool.query('select response, reason from event_rsvp where event_id = $1 and user_id = $2', [ev.data.id, uid])).rows[0];
+  assert.deepEqual([r.response, r.reason], ['no_asistire', 'Boda de mi prima']);
+  // enlace manipulado: otro componente con la firma del primero
+  const other = (await pool.query(`select id from users where email = 'componente.b@estrella.demo'`)).rows[0].id;
+  const forged = Buffer.from(`${ev.data.id}.${other}.s`).toString('base64url') + '.' + yes.split('.')[1];
+  assert.equal((await fetch(`${base}/rsvp/${forged}`, { method: 'POST' })).status, 404);
+});
+
 test('asignación automática: cada componente recibe su parte y nunca otra voz', async () => {
   const a = await login('componente.a@estrella.demo');
   const b = await login('componente.b@estrella.demo');
