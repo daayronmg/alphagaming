@@ -7,7 +7,7 @@ import { useAuth } from '../lib/auth';
 import { readPdfText } from '../lib/pdf';
 import { useLoad, Notice, Field, useToast, Spinner } from '../components/ui';
 import { InstrumentVoicePicker } from './MarchaDetail';
-import { detectBook, validateBook, type BookEntry } from '../../../shared/book';
+import { detectBook, detectInstrument, validateBook, type BookEntry } from '../../../shared/book';
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const STATUS: Record<string, string> = { creada: 'Marcha nueva', añadida: 'Parte añadida', nueva_version: 'Nueva versión' };
@@ -27,6 +27,7 @@ export default function ImportBook() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<any[] | null>(null);
   const [notes, setNotes] = useState(false);
+  const [detected, setDetected] = useState<string | null | undefined>(undefined); // texto de lo leído; null = no encontrado
 
   const instruments = (struct.data ?? []).flatMap((s) => s.instruments);
   const existing = useMemo(() => new Map((marchas.data ?? []).filter((m) => !m.is_demo).map((m) => [norm(m.title), m])), [marchas.data]);
@@ -40,13 +41,22 @@ export default function ImportBook() {
   if (!can('library.manage')) return <div className="page"><Notice kind="danger">Sin permiso.</Notice></div>;
 
   const pick = async (f: File | null) => {
-    setFile(f); setEntries([]); setDone(null); setPageCount(0);
+    setFile(f); setEntries([]); setDone(null); setPageCount(0); setDetected(undefined);
     if (!f) return;
     setReading(true);
     try {
       const pages = await readPdfText(f);
       setPageCount(pages.length);
       setEntries(detectBook(pages));
+      // instrumento y voz: los lee la app del PDF (o del nombre del archivo); la dirección solo lo comprueba
+      const d = detectInstrument(pages, f.name);
+      const inst = d && instruments.find((i: any) => norm(i.name) === norm(d.instrument));
+      if (inst) {
+        const voice = d!.voice ? inst.voices.find((v: any) => norm(v.name).startsWith(`${d!.voice}`)) : null;
+        setIv({ instrument_id: inst.id, voice_id: voice?.id ?? null });
+        setLabel('');
+        setDetected(`${inst.name}${voice ? ` ${voice.name}` : ''}`);
+      } else setDetected(null);
     } catch { toast({ kind: 'error', text: 'El PDF no se puede leer. Comprueba que no está dañado ni protegido.' }); setFile(null); }
     finally { setReading(false); }
   };
@@ -71,10 +81,10 @@ export default function ImportBook() {
 
   return (
     <div className="page stack lg">
-      <div className="page-head"><div><div className="eyebrow"><Link to="/biblioteca">Biblioteca</Link></div><h1>Importar libreto</h1></div></div>
+      <div className="page-head"><div><div className="eyebrow"><Link to="/biblioteca">Biblioteca</Link></div><h1>Subir marchas</h1></div></div>
       <Notice kind="info" title="Cómo funciona">
-        Sube un PDF con varias marchas de un mismo instrumento y voz (por ejemplo, el libreto de Corneta 3ª). ESTRELLA lee la cabecera de cada página y propone
-        el título y el autor; <strong>revisa la lista antes de importar</strong>. Cada marcha se guarda como un PDF propio. Si la marcha ya existe (mismo título)
+        Sube un PDF con varias marchas de un mismo instrumento y voz (por ejemplo, el libreto de Corneta 3ª). ESTRELLA lee el PDF y averigua{' '}
+        <strong>para qué instrumento y voz es</strong>, el título y el autor de cada marcha; <strong>revisa la propuesta antes de importar</strong>. Cada marcha se guarda como un PDF propio. Si la marcha ya existe (mismo título)
         se le añade esta parte o se publica como nueva versión; si no, se crea. El libreto original no se modifica.
       </Notice>
       {done ? (
@@ -90,6 +100,8 @@ export default function ImportBook() {
         <>
           <div className="card stack">
             <Field label="Libreto (PDF)"><input className="input" type="file" accept="application/pdf,.pdf" onChange={(e) => pick(e.target.files?.[0] ?? null)} /></Field>
+            {detected && <Notice kind="ok" title={`Es para ${detected}`}>Lo ha leído la app del PDF. Si no es así, cámbialo aquí abajo.</Notice>}
+            {detected === null && <Notice kind="warn" title="¿Para qué instrumento es?">No lo pone en el PDF ni en el nombre del archivo: elige el instrumento y la voz.</Notice>}
             <InstrumentVoicePicker value={iv} onChange={setIv} />
             <Field label="Nombre de la parte"><input className="input" value={label} placeholder={autoLabel || 'Corneta 3ª'} onChange={(e) => setLabel(e.target.value)} /></Field>
           </div>

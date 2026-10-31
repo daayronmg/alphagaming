@@ -67,3 +67,50 @@ export function validateBook(entries: BookEntry[], pageCount: number): string | 
   }
   return null;
 }
+
+// instrumentos que aparecen en los rótulos de las partes (sin acentos, en minúscula)
+const INSTRUMENTS: [string, RegExp][] = [
+  ['Corneta', /\bcornetas?\b/], ['Trompeta', /\btrompetas?\b/], ['Trombón', /\btrombon(es)?\b/],
+  ['Bombardino', /\bbombardinos?\b/], ['Caja', /\b(caja|redoblante)s?\b/], ['Bombo', /\bbombos?\b/], ['Platos', /\bplatos\b/],
+];
+const ORDINAL: Record<string, number> = { primera: 1, primer: 1, segunda: 2, segundo: 2, tercera: 3, tercer: 3, cuarta: 4, cuarto: 4 };
+const plain = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/** Lee el instrumento y la voz de un rótulo como «Corneta 3ª», «3ª Corneta», «Trompeta 1» o «Corneta tercera». */
+export function instrumentInLabel(label: string): { instrument: string; voice: number | null } | null {
+  const s = plain(label).replace(/[_.-]+/g, ' ');
+  // el nombre de la banda («Banda de Cornetas y Tambores…») no es el rótulo de la parte
+  if (/\bbanda\b|\btambores\b|\bcc y tt\b/.test(s)) return null;
+  for (const [name, re] of INSTRUMENTS) {
+    const m = re.exec(s);
+    if (!m) continue;
+    const after = s.slice(m.index + m[0].length), before = s.slice(0, m.index);
+    const num = /^\s*(\d)\s*(ª|º|a|o)?(\s|$)/.exec(after) ?? /(^|\s)(\d)\s*(ª|º|a|o)?\s*(voz\s*)?$/.exec(before);
+    const word = /^\s*(primera|primer|segunda|segundo|tercera|tercer|cuarta|cuarto)\b/.exec(after) ?? /\b(primera|primer|segunda|segundo|tercera|tercer|cuarta|cuarto)\s*$/.exec(before);
+    const voice = num ? Number(num[1] && /\d/.test(num[1]) ? num[1] : num[2]) : word ? ORDINAL[word[1]] : null;
+    return { instrument: name, voice: voice && voice >= 1 && voice <= 4 ? voice : null };
+  }
+  return null;
+}
+
+/** Instrumento y voz de un libreto: el rótulo que más se repite en sus páginas o, si no hay, el nombre del archivo. */
+export function detectInstrument(pages: PageText[], fileName = ''): { instrument: string; voice: number | null } | null {
+  const votes = new Map<string, number>();
+  for (const p of pages) {
+    const seen = new Set<string>();
+    for (const it of p.items) {
+      const t = it.str.trim();
+      if (t.length < 4 || t.length > 40) continue;
+      const d = instrumentInLabel(t);
+      if (d) seen.add(`${d.instrument}|${d.voice ?? ''}`);
+    }
+    for (const k of seen) votes.set(k, (votes.get(k) ?? 0) + 1);
+  }
+  // «Corneta 3ª» y «Corneta 3» cuentan igual; si una página dice solo «Corneta», cuenta para la voz más votada
+  const best = [...votes].sort((a, b) => (b[0].endsWith('|') ? 0 : 1) - (a[0].endsWith('|') ? 0 : 1) || b[1] - a[1])[0];
+  if (best && best[1] >= Math.max(1, Math.ceil(pages.length * 0.3))) {
+    const [instrument, v] = best[0].split('|');
+    return { instrument, voice: v ? Number(v) : null };
+  }
+  return instrumentInLabel(fileName.replace(/\.pdf$/i, ''));
+}
