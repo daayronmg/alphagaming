@@ -1,0 +1,6 @@
+# Runtime (GUI). The core + CLI + tests use only the Python standard library.
+PySide6>=6.6,<7.0
+
+# Build (Windows .exe). Install when packaging:
+#   pip install pyinstaller
+# pyinstaller>=6.0

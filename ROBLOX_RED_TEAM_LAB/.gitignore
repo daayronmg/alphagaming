@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# PyInstaller build artifacts
+WindowsApp/build/
+WindowsApp/dist/
+
+# Keep the committed demo reports as evidence, ignore ad-hoc ones
+Reports/*
+!Reports/demo_report.json
+!Reports/demo_report.csv
+!Reports/demo_report.html
+!Reports/README.md
