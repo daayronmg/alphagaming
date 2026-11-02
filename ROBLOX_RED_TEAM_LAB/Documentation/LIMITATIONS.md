@@ -51,7 +51,7 @@ El entorno de desarrollo era Linux (sin Windows, sin .NET, sin Luau CLI).
 | Núcleo Python (`redteamlab`) | `python3 -m unittest` (33 tests) | **Ejecutado, 33/33 OK** |
 | CLI `demo` (genera JSON/CSV/HTML) | Ejecutado | **OK, informes generados en `Reports/`** |
 | Lógica pura Luau (`rtl_spec.lua`) | Ejecutada vía `lupa` (30 tests) | **Ejecutado, 30/30 OK** |
-| GUI PySide6 | **No ejecutada** | Sin PySide6 ni display en el entorno; código escrito y verificado por compilación (`py_compile`). Requiere ejecutarse en una máquina con Qt. |
+| GUI PySide6 | **Ejecutada (smoke test headless)** | Con PySide6 6.12 y `QT_QPA_PLATFORM=offscreen`: la ventana completa se construye, el dashboard se actualiza al importar (12 PASS / 2 FAIL / 1 INCONCLUSIVE / 2 PENDING), cada módulo rellena su tabla y la exportación funciona. Capturas en `Reports/screenshots/`. En un PC con pantalla se abre con `python run_gui.py`. |
 | `RobloxRedTeamLab.exe` | **No compilado** | PyInstaller compila por-SO; un .exe de Windows no se puede producir desde Linux. Receta reproducible en `build_exe.ps1`. |
 | Scripts de integración Roblox (`RTL_Bootstrap`, `RTL_SelfTest`, `RTL_TestHarness`) | **No ejecutados** | Requieren Roblox Studio (usan servicios de Roblox). Verificados por revisión; la lógica pura que invocan sí está testeada. |
 

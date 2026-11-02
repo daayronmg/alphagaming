@@ -15,3 +15,5 @@ Reports/*
 !Reports/demo_report.csv
 !Reports/demo_report.html
 !Reports/README.md
+!Reports/screenshots/
+!Reports/screenshots/*.png

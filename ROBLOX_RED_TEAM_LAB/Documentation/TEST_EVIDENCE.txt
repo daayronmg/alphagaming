@@ -29,3 +29,11 @@ Stats: {
   "alerts": 2,
   "risk_score": 100
 }
+
+================ 4) Smoke test GUI PySide6 (headless, offscreen) ================
+Fecha (UTC): 2026-11-02T22:06:24Z
+PySide6: 6.12.0
+Resultado: ventana construida; dashboard inicial 17 PENDING; tras importar
+  -> 12 PASS / 2 FAIL / 1 INCONCLUSIVE / 2 PENDING; tablas por modulo
+  (Movement 5, RemoteEvents 4, Economy 5, Permissions 3); export JSON/CSV/HTML OK.
+Capturas: Reports/screenshots/01_dashboard.png, 02_economy.png, 03_movement.png
