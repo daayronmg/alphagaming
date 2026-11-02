@@ -1,0 +1,55 @@
+name: Build ROBLOX RED TEAM LAB (.exe)
+
+# Compila el ejecutable de Windows en un runner Windows real y lo publica como
+# artefacto descargable. Se lanza en cada push que toque el proyecto y también
+# a mano desde la pestaña Actions (Run workflow).
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "ROBLOX_RED_TEAM_LAB/**"
+      - ".github/workflows/build-redteamlab-exe.yml"
+  workflow_dispatch: {}
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: ROBLOX_RED_TEAM_LAB/WindowsApp
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Run Python unit tests
+        working-directory: ROBLOX_RED_TEAM_LAB
+        run: python -m unittest discover -s Tests -p "test_*.py"
+
+      - name: Build executable
+        working-directory: ROBLOX_RED_TEAM_LAB/WindowsApp
+        run: pyinstaller --noconfirm redteamlab.spec
+
+      - name: Package build
+        working-directory: ROBLOX_RED_TEAM_LAB/WindowsApp
+        run: Compress-Archive -Path dist/RobloxRedTeamLab/* -DestinationPath RobloxRedTeamLab-windows.zip
+
+      - name: Upload executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RobloxRedTeamLab-windows
+          path: ROBLOX_RED_TEAM_LAB/WindowsApp/RobloxRedTeamLab-windows.zip
+          if-no-files-found: error

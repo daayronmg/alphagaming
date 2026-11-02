@@ -1,0 +1,39 @@
+ROBLOX RED TEAM LAB - Evidencia de ejecucion
+Fecha (UTC): 2026-11-02T21:55:34Z
+Entorno: Linux 6.18.44-fc-v185 x86_64 | Python 3.13.18 | lupa 2.8
+
+================ 1) Tests Python (unittest) ================
+----------------------------------------------------------------------
+Ran 33 tests in 0.016s
+
+OK
+
+================ 2) Tests logica Luau (via lupa) ================
+30 passed, 0 failed
+
+[lupa runner] total: 30 passed, 0 failed
+
+================ 3) CLI demo (generacion de informes) ================
+Generated demo reports from bundled sample log:
+  JSON  -> /home/user/alphagaming/ROBLOX_RED_TEAM_LAB/Reports/demo_report.json
+  CSV   -> /home/user/alphagaming/ROBLOX_RED_TEAM_LAB/Reports/demo_report.csv
+  HTML  -> /home/user/alphagaming/ROBLOX_RED_TEAM_LAB/Reports/demo_report.html
+
+Stats: {
+  "total": 17,
+  "executed": 15,
+  "pending": 2,
+  "passed": 12,
+  "failed": 2,
+  "inconclusive": 1,
+  "alerts": 2,
+  "risk_score": 100
+}
+
+================ 4) Smoke test GUI PySide6 (headless, offscreen) ================
+Fecha (UTC): 2026-11-02T22:06:24Z
+PySide6: 6.12.0
+Resultado: ventana construida; dashboard inicial 17 PENDING; tras importar
+  -> 12 PASS / 2 FAIL / 1 INCONCLUSIVE / 2 PENDING; tablas por modulo
+  (Movement 5, RemoteEvents 4, Economy 5, Permissions 3); export JSON/CSV/HTML OK.
+Capturas: Reports/screenshots/01_dashboard.png, 02_economy.png, 03_movement.png

@@ -1,0 +1,154 @@
+{
+  "_comment": "Example result log as produced by the Luau self-test harness (RobloxModules/src/ServerScriptService/Tests). Used by `redteamlab demo` and the GUI to populate the UI and reports. These are illustrative sample values, not measurements of any live system.",
+  "results": [
+    {
+      "scenario_id": "MOV-001",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:01+00:00",
+      "server_rejected": true,
+      "detection_source": "SERVER_REJECT",
+      "observed": "Horizontal speed 180 studs/s clamped to 24; position snapped back.",
+      "server_response": "MovementValidator rejected update; authoritative position restored.",
+      "evidence": ["server-log: MOV speed=180 > max=24 -> reject", "snapback dx=0"]
+    },
+    {
+      "scenario_id": "MOV-002",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:02+00:00",
+      "server_rejected": true,
+      "detection_source": "SERVER_REJECT",
+      "observed": "500-stud single-tick jump rejected; last valid position restored.",
+      "server_response": "Teleport check failed (impossible dt); update discarded.",
+      "evidence": ["server-log: dist=500 dt=0.1 implies 5000 studs/s"]
+    },
+    {
+      "scenario_id": "MOV-003",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:03+00:00",
+      "server_rejected": false,
+      "detection_source": "NONE",
+      "observed": "Sustained 8s airborne state accepted by server; no ground check enforced.",
+      "server_response": "No correction applied.",
+      "evidence": ["server-log: air_time=8.0s, no raycast ground validation present"]
+    },
+    {
+      "scenario_id": "MOV-005",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:04+00:00",
+      "server_rejected": true,
+      "detection_source": "SERVER_REJECT",
+      "observed": "Only first jump honored; 9 extra jumps rejected while airborne.",
+      "server_response": "Jump denied: grounded=false.",
+      "evidence": ["server-log: jumps_honored=1 of 10"]
+    },
+    {
+      "scenario_id": "RMT-001",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:05+00:00",
+      "server_rejected": true,
+      "detection_source": "SERVER_REJECT",
+      "observed": "Calls with wrong argument types rejected by schema validation.",
+      "server_response": "RemoteValidator: type mismatch -> drop.",
+      "evidence": ["server-log: expected number got string"]
+    },
+    {
+      "scenario_id": "RMT-002",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:06+00:00",
+      "server_rejected": true,
+      "detection_source": "SERVER_REJECT",
+      "observed": "NaN/Inf/negative/extreme values rejected by range + finiteness checks.",
+      "server_response": "RemoteValidator: non-finite / out-of-range -> drop.",
+      "evidence": ["server-log: rejected -1, 1e308, nan, inf"]
+    },
+    {
+      "scenario_id": "RMT-003",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:07+00:00",
+      "server_rejected": true,
+      "detection_source": "CUSTOM_DETECTOR",
+      "observed": "200 calls/s throttled to 5; excess dropped.",
+      "server_response": "RateLimiter: 195 calls dropped.",
+      "evidence": ["server-log: window=1s limit=5 dropped=195"]
+    },
+    {
+      "scenario_id": "RMT-004",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:08+00:00",
+      "server_rejected": true,
+      "detection_source": "SERVER_REJECT",
+      "observed": "Client-supplied coin value ignored; server recomputed authoritative balance.",
+      "server_response": "SyncStats ignores client fields for server-owned state.",
+      "evidence": ["server-log: client claimed coins=999999, server kept 120"]
+    },
+    {
+      "scenario_id": "ECO-001",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:09+00:00",
+      "server_rejected": false,
+      "detection_source": "NONE",
+      "observed": "Unbacked +100000 coin request was applied.",
+      "server_response": "Balance increased without a validated transaction.",
+      "evidence": ["server-log: balance 120 -> 100120 with no transaction id"]
+    },
+    {
+      "scenario_id": "ECO-002",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:10+00:00",
+      "server_rejected": true,
+      "detection_source": "SERVER_REJECT",
+      "observed": "Negative amount rejected.",
+      "server_response": "Economy: amount < 0 -> reject.",
+      "evidence": ["server-log: amount=-500 rejected"]
+    },
+    {
+      "scenario_id": "ECO-003",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:11+00:00",
+      "server_rejected": true,
+      "detection_source": "SERVER_REJECT",
+      "observed": "Replayed daily_bonus claim denied after first grant.",
+      "server_response": "Economy: reward already granted (idempotent).",
+      "evidence": ["server-log: grants=1 of 6 attempts"]
+    },
+    {
+      "scenario_id": "ECO-004",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:12+00:00",
+      "detection_source": "UNKNOWN",
+      "observed": "Concurrency outcome not captured by the harness in this run.",
+      "server_response": "",
+      "evidence": ["harness note: lock behavior under concurrency not instrumented yet"]
+    },
+    {
+      "scenario_id": "ECO-005",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:13+00:00",
+      "server_rejected": true,
+      "detection_source": "SERVER_REJECT",
+      "observed": "Grant of unowned legendary_sword denied.",
+      "server_response": "Inventory: no valid acquisition source -> reject.",
+      "evidence": ["server-log: add legendary_sword x99 rejected"]
+    },
+    {
+      "scenario_id": "PRM-001",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:14+00:00",
+      "server_rejected": true,
+      "detection_source": "SERVER_REJECT",
+      "observed": "Non-admin KickPlayer call denied.",
+      "server_response": "Permissions: role=player, required=admin -> deny.",
+      "evidence": ["server-log: denied KickPlayer for non-admin"]
+    },
+    {
+      "scenario_id": "PRM-003",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:15+00:00",
+      "server_rejected": true,
+      "detection_source": "HYPERION",
+      "observed": "Self role-assignment to admin denied. detection_source set to HYPERION but no verifiable Hyperion evidence is attached.",
+      "server_response": "Role unchanged.",
+      "evidence": []
+    }
+  ]
+}

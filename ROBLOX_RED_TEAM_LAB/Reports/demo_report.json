@@ -1,0 +1,733 @@
+{
+  "meta": {
+    "app": "ROBLOX RED TEAM LAB",
+    "version": "1.0.0",
+    "generated_at": "2026-11-02T21:55:34+00:00",
+    "operator_note": "Authorized testing of the operator's own Roblox experience. Client is treated as untrusted; the server is the authority."
+  },
+  "stats": {
+    "total": 17,
+    "executed": 15,
+    "pending": 2,
+    "passed": 12,
+    "failed": 2,
+    "inconclusive": 1,
+    "alerts": 2,
+    "risk_score": 100
+  },
+  "scenarios": [
+    {
+      "id": "MOV-001",
+      "name": "Speed hack (excessive walk speed)",
+      "category": "movement",
+      "description": "Client reports horizontal displacement implying a speed above the allowed maximum.",
+      "objective": "Verify the server rejects or clamps movement that exceeds the configured max speed.",
+      "initial_conditions": "Player spawned on a flat baseplate; server max speed configured.",
+      "procedure": "Harness fires movement updates whose delta implies speed > maxSpeed for several ticks.",
+      "expected_result": "Server rejects/corrects position (snapback) and flags the anomaly; no speed advantage persists.",
+      "severity_if_failed": "HIGH",
+      "expect_rejected": true,
+      "params": {
+        "max_speed_studs_s": 24,
+        "injected_speed_studs_s": 180
+      }
+    },
+    {
+      "id": "MOV-002",
+      "name": "Teleport (impossible displacement)",
+      "category": "movement",
+      "description": "Position jumps a large distance within a single tick (no path, no dt to justify it).",
+      "objective": "Verify the server detects an impossible single-tick displacement and rejects it.",
+      "initial_conditions": "Player at a known position; server tracks last authoritative position and time.",
+      "procedure": "Harness sets a new position far from the last authoritative one within one tick.",
+      "expected_result": "Server rejects the teleport and restores the last valid position; anomaly logged.",
+      "severity_if_failed": "HIGH",
+      "expect_rejected": true,
+      "params": {
+        "max_speed_studs_s": 24,
+        "jump_distance_studs": 500,
+        "dt_s": 0.1
+      }
+    },
+    {
+      "id": "MOV-003",
+      "name": "Fly (sustained unsupported altitude)",
+      "category": "movement",
+      "description": "Vertical position stays elevated with no supporting part / jump arc.",
+      "objective": "Verify the server detects sustained unsupported altitude.",
+      "initial_conditions": "Player on ground; raycast-based ground check available server-side.",
+      "procedure": "Harness reports elevated Y for longer than a normal jump could sustain.",
+      "expected_result": "Server flags sustained unsupported altitude and corrects/denies the state.",
+      "severity_if_failed": "MEDIUM",
+      "expect_rejected": true,
+      "params": {
+        "max_air_time_s": 1.5,
+        "injected_air_time_s": 8.0
+      }
+    },
+    {
+      "id": "MOV-004",
+      "name": "Noclip (movement through collision)",
+      "category": "movement",
+      "description": "Position crosses a solid boundary the server knows about.",
+      "objective": "Verify the server validates movement against server-side collision/zones.",
+      "initial_conditions": "A server-known solid wall / restricted zone exists.",
+      "procedure": "Harness reports a path that passes through the solid boundary.",
+      "expected_result": "Server rejects the crossing; player cannot occupy the restricted space.",
+      "severity_if_failed": "MEDIUM",
+      "expect_rejected": true,
+      "params": {
+        "zone": "restricted_wall_A"
+      }
+    },
+    {
+      "id": "MOV-005",
+      "name": "Infinite jump (repeated jumps while airborne)",
+      "category": "movement",
+      "description": "Jump requested repeatedly without ever touching the ground.",
+      "objective": "Verify jumps are only honored when the server believes the player is grounded.",
+      "initial_conditions": "Server tracks grounded state.",
+      "procedure": "Harness requests jump N times while server-side grounded state is false.",
+      "expected_result": "Server honors at most one jump until grounded again; extra jumps rejected.",
+      "severity_if_failed": "LOW",
+      "expect_rejected": true,
+      "params": {
+        "jumps_requested": 10
+      }
+    },
+    {
+      "id": "RMT-001",
+      "name": "Unexpected argument types",
+      "category": "remote",
+      "description": "A RemoteEvent is fired with argument types it does not expect.",
+      "objective": "Verify the server validates argument types and rejects malformed calls.",
+      "initial_conditions": "A RemoteEvent with a known expected signature.",
+      "procedure": "Harness fires the remote with wrong types (string where number expected, table, nil...).",
+      "expected_result": "Server rejects the call, logs it, and does not mutate state.",
+      "severity_if_failed": "MEDIUM",
+      "expect_rejected": true,
+      "params": {
+        "remote": "RequestPurchase",
+        "bad_args": [
+          "'abc'",
+          "{}",
+          "nil"
+        ]
+      }
+    },
+    {
+      "id": "RMT-002",
+      "name": "Out-of-range / extreme / NaN / Inf values",
+      "category": "remote",
+      "description": "Numeric arguments are negative, extreme, NaN or Infinity.",
+      "objective": "Verify the server range-checks numbers and rejects NaN/Inf/negative where invalid.",
+      "initial_conditions": "A RemoteEvent accepting a bounded numeric argument.",
+      "procedure": "Harness sends -1, 1e308, NaN, math.huge for a quantity that must be a small positive int.",
+      "expected_result": "Server rejects every invalid value; no state change.",
+      "severity_if_failed": "HIGH",
+      "expect_rejected": true,
+      "params": {
+        "remote": "SetQuantity",
+        "values": [
+          -1,
+          1e+308,
+          "NaN",
+          "Inf"
+        ]
+      }
+    },
+    {
+      "id": "RMT-003",
+      "name": "Excessive call frequency (rate limit)",
+      "category": "remote",
+      "description": "A RemoteEvent is fired far faster than any legitimate client would.",
+      "objective": "Verify server-side per-player rate limiting throttles/denies floods.",
+      "initial_conditions": "Rate limiter configured for the remote.",
+      "procedure": "Harness fires the remote N times within a short window.",
+      "expected_result": "Calls beyond the limit are dropped/denied and logged; server stays responsive.",
+      "severity_if_failed": "MEDIUM",
+      "expect_rejected": true,
+      "params": {
+        "remote": "ClaimReward",
+        "calls": 200,
+        "window_s": 1.0,
+        "limit": 5
+      }
+    },
+    {
+      "id": "RMT-004",
+      "name": "Client-authoritative field mutation attempt",
+      "category": "remote",
+      "description": "Client tries to set a value only the server should own (e.g. its own balance).",
+      "objective": "Verify the server ignores client-supplied values for server-owned state.",
+      "initial_conditions": "Server owns the authoritative balance/stat.",
+      "procedure": "Harness fires a remote carrying a desired balance value.",
+      "expected_result": "Server ignores the client value and derives state itself; attempt logged.",
+      "severity_if_failed": "CRITICAL",
+      "expect_rejected": true,
+      "params": {
+        "remote": "SyncStats",
+        "claimed": {
+          "coins": 999999
+        }
+      }
+    },
+    {
+      "id": "ECO-001",
+      "name": "Unauthorized coin alteration",
+      "category": "economy",
+      "description": "Attempt to increase currency without a valid, server-verified transaction.",
+      "objective": "Verify currency only changes through server-validated transactions.",
+      "initial_conditions": "Player has a known server-held balance.",
+      "procedure": "Harness requests a balance increase with no backing purchase/reward.",
+      "expected_result": "Server denies the change; balance unchanged; attempt logged.",
+      "severity_if_failed": "CRITICAL",
+      "expect_rejected": true,
+      "params": {
+        "delta": 100000
+      }
+    },
+    {
+      "id": "ECO-002",
+      "name": "Negative amount transaction",
+      "category": "economy",
+      "description": "A transaction with a negative quantity/price.",
+      "objective": "Verify the server rejects negative amounts (no refund/drain exploits).",
+      "initial_conditions": "A purchase/transfer remote exists.",
+      "procedure": "Harness submits a transaction with amount < 0.",
+      "expected_result": "Server rejects it; no balance movement.",
+      "severity_if_failed": "HIGH",
+      "expect_rejected": true,
+      "params": {
+        "amount": -500
+      }
+    },
+    {
+      "id": "ECO-003",
+      "name": "Duplicate / replayed reward claim",
+      "category": "economy",
+      "description": "The same one-time reward claim is submitted twice.",
+      "objective": "Verify reward grants are idempotent (server-tracked, single-grant).",
+      "initial_conditions": "A one-time reward the player has already claimed.",
+      "procedure": "Harness replays the claim request.",
+      "expected_result": "Second claim is denied; reward granted exactly once.",
+      "severity_if_failed": "HIGH",
+      "expect_rejected": true,
+      "params": {
+        "reward_id": "daily_bonus",
+        "replays": 5
+      }
+    },
+    {
+      "id": "ECO-004",
+      "name": "Repeated purchase race (double-spend)",
+      "category": "economy",
+      "description": "Many purchase requests fired concurrently to try to spend the same funds twice.",
+      "objective": "Verify the server serializes/locks balance mutations.",
+      "initial_conditions": "Balance only sufficient for one purchase.",
+      "procedure": "Harness fires several concurrent purchase requests.",
+      "expected_result": "At most one purchase succeeds; balance never goes negative.",
+      "severity_if_failed": "HIGH",
+      "expect_rejected": true,
+      "params": {
+        "concurrent": 20,
+        "price": 100
+      }
+    },
+    {
+      "id": "ECO-005",
+      "name": "Inventory manipulation (grant unowned item)",
+      "category": "economy",
+      "description": "Attempt to add an item the player never legitimately obtained.",
+      "objective": "Verify inventory additions require a server-validated source.",
+      "initial_conditions": "Server-held inventory.",
+      "procedure": "Harness requests adding an item id with no valid acquisition.",
+      "expected_result": "Server denies the addition; inventory unchanged.",
+      "severity_if_failed": "HIGH",
+      "expect_rejected": true,
+      "params": {
+        "item_id": "legendary_sword",
+        "qty": 99
+      }
+    },
+    {
+      "id": "PRM-001",
+      "name": "Non-admin invokes admin action",
+      "category": "permissions",
+      "description": "A player without the admin role calls an admin-only remote.",
+      "objective": "Verify the server checks role before executing privileged actions.",
+      "initial_conditions": "Caller has no admin role server-side.",
+      "procedure": "Harness invokes an admin remote as a normal player.",
+      "expected_result": "Server denies the action and logs the attempt.",
+      "severity_if_failed": "CRITICAL",
+      "expect_rejected": true,
+      "params": {
+        "remote": "KickPlayer"
+      }
+    },
+    {
+      "id": "PRM-002",
+      "name": "Restricted function from unauthorized context",
+      "category": "permissions",
+      "description": "A restricted function is invoked from a context not allowed to call it.",
+      "objective": "Verify restricted functions validate the caller/context, not just presence.",
+      "initial_conditions": "A function restricted to a specific role/context.",
+      "procedure": "Harness invokes it from an unauthorized context.",
+      "expected_result": "Server denies execution.",
+      "severity_if_failed": "HIGH",
+      "expect_rejected": true,
+      "params": {
+        "remote": "GrantRole"
+      }
+    },
+    {
+      "id": "PRM-003",
+      "name": "Privilege escalation via role self-assignment",
+      "category": "permissions",
+      "description": "A player attempts to assign themselves a higher role.",
+      "objective": "Verify role assignment is server-controlled and not client-driven.",
+      "initial_conditions": "Role data owned by the server.",
+      "procedure": "Harness requests assigning itself the admin role.",
+      "expected_result": "Server denies; role unchanged; attempt logged.",
+      "severity_if_failed": "CRITICAL",
+      "expect_rejected": true,
+      "params": {
+        "target_role": "admin"
+      }
+    }
+  ],
+  "results": [
+    {
+      "scenario_id": "MOV-001",
+      "status": "PASS",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:01+00:00",
+      "observed_behavior": "Horizontal speed 180 studs/s clamped to 24; position snapped back.",
+      "server_response": "MovementValidator rejected update; authoritative position restored.",
+      "detection_source": "SERVER_REJECT",
+      "evidence": [
+        "server-log: MOV speed=180 > max=24 -> reject",
+        "snapback dx=0"
+      ],
+      "severity": "INFO",
+      "recommendation": "No action required. Keep the control under regression testing.",
+      "obtained_result": "Server behaved securely (anomalous input was rejected/corrected).",
+      "raw": {
+        "scenario_id": "MOV-001",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:01+00:00",
+        "server_rejected": true,
+        "detection_source": "SERVER_REJECT",
+        "observed": "Horizontal speed 180 studs/s clamped to 24; position snapped back.",
+        "server_response": "MovementValidator rejected update; authoritative position restored.",
+        "evidence": [
+          "server-log: MOV speed=180 > max=24 -> reject",
+          "snapback dx=0"
+        ]
+      }
+    },
+    {
+      "scenario_id": "MOV-002",
+      "status": "PASS",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:02+00:00",
+      "observed_behavior": "500-stud single-tick jump rejected; last valid position restored.",
+      "server_response": "Teleport check failed (impossible dt); update discarded.",
+      "detection_source": "SERVER_REJECT",
+      "evidence": [
+        "server-log: dist=500 dt=0.1 implies 5000 studs/s"
+      ],
+      "severity": "INFO",
+      "recommendation": "No action required. Keep the control under regression testing.",
+      "obtained_result": "Server behaved securely (anomalous input was rejected/corrected).",
+      "raw": {
+        "scenario_id": "MOV-002",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:02+00:00",
+        "server_rejected": true,
+        "detection_source": "SERVER_REJECT",
+        "observed": "500-stud single-tick jump rejected; last valid position restored.",
+        "server_response": "Teleport check failed (impossible dt); update discarded.",
+        "evidence": [
+          "server-log: dist=500 dt=0.1 implies 5000 studs/s"
+        ]
+      }
+    },
+    {
+      "scenario_id": "MOV-003",
+      "status": "FAIL",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:03+00:00",
+      "observed_behavior": "Sustained 8s airborne state accepted by server; no ground check enforced.",
+      "server_response": "No correction applied.",
+      "detection_source": "NONE",
+      "evidence": [
+        "server-log: air_time=8.0s, no raycast ground validation present"
+      ],
+      "severity": "MEDIUM",
+      "recommendation": "Implement/repair server-side validation for 'Fly (sustained unsupported altitude)'. Treat the client as untrusted and enforce this check on the server.",
+      "obtained_result": "Server accepted an input it should have rejected (exposure).",
+      "raw": {
+        "scenario_id": "MOV-003",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:03+00:00",
+        "server_rejected": false,
+        "detection_source": "NONE",
+        "observed": "Sustained 8s airborne state accepted by server; no ground check enforced.",
+        "server_response": "No correction applied.",
+        "evidence": [
+          "server-log: air_time=8.0s, no raycast ground validation present"
+        ]
+      }
+    },
+    {
+      "scenario_id": "MOV-004",
+      "status": "PENDING",
+      "run_id": "",
+      "timestamp": "2026-11-02T21:55:34+00:00",
+      "observed_behavior": "",
+      "server_response": "",
+      "detection_source": "UNKNOWN",
+      "evidence": [],
+      "severity": "INFO",
+      "recommendation": "Run the Luau self-test harness for this scenario to produce a result.",
+      "obtained_result": "Not executed yet.",
+      "raw": {}
+    },
+    {
+      "scenario_id": "MOV-005",
+      "status": "PASS",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:04+00:00",
+      "observed_behavior": "Only first jump honored; 9 extra jumps rejected while airborne.",
+      "server_response": "Jump denied: grounded=false.",
+      "detection_source": "SERVER_REJECT",
+      "evidence": [
+        "server-log: jumps_honored=1 of 10"
+      ],
+      "severity": "INFO",
+      "recommendation": "No action required. Keep the control under regression testing.",
+      "obtained_result": "Server behaved securely (anomalous input was rejected/corrected).",
+      "raw": {
+        "scenario_id": "MOV-005",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:04+00:00",
+        "server_rejected": true,
+        "detection_source": "SERVER_REJECT",
+        "observed": "Only first jump honored; 9 extra jumps rejected while airborne.",
+        "server_response": "Jump denied: grounded=false.",
+        "evidence": [
+          "server-log: jumps_honored=1 of 10"
+        ]
+      }
+    },
+    {
+      "scenario_id": "RMT-001",
+      "status": "PASS",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:05+00:00",
+      "observed_behavior": "Calls with wrong argument types rejected by schema validation.",
+      "server_response": "RemoteValidator: type mismatch -> drop.",
+      "detection_source": "SERVER_REJECT",
+      "evidence": [
+        "server-log: expected number got string"
+      ],
+      "severity": "INFO",
+      "recommendation": "No action required. Keep the control under regression testing.",
+      "obtained_result": "Server behaved securely (anomalous input was rejected/corrected).",
+      "raw": {
+        "scenario_id": "RMT-001",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:05+00:00",
+        "server_rejected": true,
+        "detection_source": "SERVER_REJECT",
+        "observed": "Calls with wrong argument types rejected by schema validation.",
+        "server_response": "RemoteValidator: type mismatch -> drop.",
+        "evidence": [
+          "server-log: expected number got string"
+        ]
+      }
+    },
+    {
+      "scenario_id": "RMT-002",
+      "status": "PASS",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:06+00:00",
+      "observed_behavior": "NaN/Inf/negative/extreme values rejected by range + finiteness checks.",
+      "server_response": "RemoteValidator: non-finite / out-of-range -> drop.",
+      "detection_source": "SERVER_REJECT",
+      "evidence": [
+        "server-log: rejected -1, 1e308, nan, inf"
+      ],
+      "severity": "INFO",
+      "recommendation": "No action required. Keep the control under regression testing.",
+      "obtained_result": "Server behaved securely (anomalous input was rejected/corrected).",
+      "raw": {
+        "scenario_id": "RMT-002",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:06+00:00",
+        "server_rejected": true,
+        "detection_source": "SERVER_REJECT",
+        "observed": "NaN/Inf/negative/extreme values rejected by range + finiteness checks.",
+        "server_response": "RemoteValidator: non-finite / out-of-range -> drop.",
+        "evidence": [
+          "server-log: rejected -1, 1e308, nan, inf"
+        ]
+      }
+    },
+    {
+      "scenario_id": "RMT-003",
+      "status": "PASS",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:07+00:00",
+      "observed_behavior": "200 calls/s throttled to 5; excess dropped.",
+      "server_response": "RateLimiter: 195 calls dropped.",
+      "detection_source": "CUSTOM_DETECTOR",
+      "evidence": [
+        "server-log: window=1s limit=5 dropped=195"
+      ],
+      "severity": "INFO",
+      "recommendation": "No action required. Keep the control under regression testing.",
+      "obtained_result": "Server behaved securely (anomalous input was rejected/corrected).",
+      "raw": {
+        "scenario_id": "RMT-003",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:07+00:00",
+        "server_rejected": true,
+        "detection_source": "CUSTOM_DETECTOR",
+        "observed": "200 calls/s throttled to 5; excess dropped.",
+        "server_response": "RateLimiter: 195 calls dropped.",
+        "evidence": [
+          "server-log: window=1s limit=5 dropped=195"
+        ]
+      }
+    },
+    {
+      "scenario_id": "RMT-004",
+      "status": "PASS",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:08+00:00",
+      "observed_behavior": "Client-supplied coin value ignored; server recomputed authoritative balance.",
+      "server_response": "SyncStats ignores client fields for server-owned state.",
+      "detection_source": "SERVER_REJECT",
+      "evidence": [
+        "server-log: client claimed coins=999999, server kept 120"
+      ],
+      "severity": "INFO",
+      "recommendation": "No action required. Keep the control under regression testing.",
+      "obtained_result": "Server behaved securely (anomalous input was rejected/corrected).",
+      "raw": {
+        "scenario_id": "RMT-004",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:08+00:00",
+        "server_rejected": true,
+        "detection_source": "SERVER_REJECT",
+        "observed": "Client-supplied coin value ignored; server recomputed authoritative balance.",
+        "server_response": "SyncStats ignores client fields for server-owned state.",
+        "evidence": [
+          "server-log: client claimed coins=999999, server kept 120"
+        ]
+      }
+    },
+    {
+      "scenario_id": "ECO-001",
+      "status": "FAIL",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:09+00:00",
+      "observed_behavior": "Unbacked +100000 coin request was applied.",
+      "server_response": "Balance increased without a validated transaction.",
+      "detection_source": "NONE",
+      "evidence": [
+        "server-log: balance 120 -> 100120 with no transaction id"
+      ],
+      "severity": "CRITICAL",
+      "recommendation": "Implement/repair server-side validation for 'Unauthorized coin alteration'. Treat the client as untrusted and enforce this check on the server.",
+      "obtained_result": "Server accepted an input it should have rejected (exposure).",
+      "raw": {
+        "scenario_id": "ECO-001",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:09+00:00",
+        "server_rejected": false,
+        "detection_source": "NONE",
+        "observed": "Unbacked +100000 coin request was applied.",
+        "server_response": "Balance increased without a validated transaction.",
+        "evidence": [
+          "server-log: balance 120 -> 100120 with no transaction id"
+        ]
+      }
+    },
+    {
+      "scenario_id": "ECO-002",
+      "status": "PASS",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:10+00:00",
+      "observed_behavior": "Negative amount rejected.",
+      "server_response": "Economy: amount < 0 -> reject.",
+      "detection_source": "SERVER_REJECT",
+      "evidence": [
+        "server-log: amount=-500 rejected"
+      ],
+      "severity": "INFO",
+      "recommendation": "No action required. Keep the control under regression testing.",
+      "obtained_result": "Server behaved securely (anomalous input was rejected/corrected).",
+      "raw": {
+        "scenario_id": "ECO-002",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:10+00:00",
+        "server_rejected": true,
+        "detection_source": "SERVER_REJECT",
+        "observed": "Negative amount rejected.",
+        "server_response": "Economy: amount < 0 -> reject.",
+        "evidence": [
+          "server-log: amount=-500 rejected"
+        ]
+      }
+    },
+    {
+      "scenario_id": "ECO-003",
+      "status": "PASS",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:11+00:00",
+      "observed_behavior": "Replayed daily_bonus claim denied after first grant.",
+      "server_response": "Economy: reward already granted (idempotent).",
+      "detection_source": "SERVER_REJECT",
+      "evidence": [
+        "server-log: grants=1 of 6 attempts"
+      ],
+      "severity": "INFO",
+      "recommendation": "No action required. Keep the control under regression testing.",
+      "obtained_result": "Server behaved securely (anomalous input was rejected/corrected).",
+      "raw": {
+        "scenario_id": "ECO-003",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:11+00:00",
+        "server_rejected": true,
+        "detection_source": "SERVER_REJECT",
+        "observed": "Replayed daily_bonus claim denied after first grant.",
+        "server_response": "Economy: reward already granted (idempotent).",
+        "evidence": [
+          "server-log: grants=1 of 6 attempts"
+        ]
+      }
+    },
+    {
+      "scenario_id": "ECO-004",
+      "status": "INCONCLUSIVE",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:12+00:00",
+      "observed_behavior": "Concurrency outcome not captured by the harness in this run.",
+      "server_response": "",
+      "detection_source": "UNKNOWN",
+      "evidence": [
+        "harness note: lock behavior under concurrency not instrumented yet"
+      ],
+      "severity": "MEDIUM",
+      "recommendation": "Add explicit server-side logging (server_rejected + evidence) for this scenario and re-run, or mark why it cannot be measured.",
+      "obtained_result": "Could not establish whether the server rejected the input from this record.",
+      "raw": {
+        "scenario_id": "ECO-004",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:12+00:00",
+        "detection_source": "UNKNOWN",
+        "observed": "Concurrency outcome not captured by the harness in this run.",
+        "server_response": "",
+        "evidence": [
+          "harness note: lock behavior under concurrency not instrumented yet"
+        ]
+      }
+    },
+    {
+      "scenario_id": "ECO-005",
+      "status": "PASS",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:13+00:00",
+      "observed_behavior": "Grant of unowned legendary_sword denied.",
+      "server_response": "Inventory: no valid acquisition source -> reject.",
+      "detection_source": "SERVER_REJECT",
+      "evidence": [
+        "server-log: add legendary_sword x99 rejected"
+      ],
+      "severity": "INFO",
+      "recommendation": "No action required. Keep the control under regression testing.",
+      "obtained_result": "Server behaved securely (anomalous input was rejected/corrected).",
+      "raw": {
+        "scenario_id": "ECO-005",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:13+00:00",
+        "server_rejected": true,
+        "detection_source": "SERVER_REJECT",
+        "observed": "Grant of unowned legendary_sword denied.",
+        "server_response": "Inventory: no valid acquisition source -> reject.",
+        "evidence": [
+          "server-log: add legendary_sword x99 rejected"
+        ]
+      }
+    },
+    {
+      "scenario_id": "PRM-001",
+      "status": "PASS",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:14+00:00",
+      "observed_behavior": "Non-admin KickPlayer call denied.",
+      "server_response": "Permissions: role=player, required=admin -> deny.",
+      "detection_source": "SERVER_REJECT",
+      "evidence": [
+        "server-log: denied KickPlayer for non-admin"
+      ],
+      "severity": "INFO",
+      "recommendation": "No action required. Keep the control under regression testing.",
+      "obtained_result": "Server behaved securely (anomalous input was rejected/corrected).",
+      "raw": {
+        "scenario_id": "PRM-001",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:14+00:00",
+        "server_rejected": true,
+        "detection_source": "SERVER_REJECT",
+        "observed": "Non-admin KickPlayer call denied.",
+        "server_response": "Permissions: role=player, required=admin -> deny.",
+        "evidence": [
+          "server-log: denied KickPlayer for non-admin"
+        ]
+      }
+    },
+    {
+      "scenario_id": "PRM-002",
+      "status": "PENDING",
+      "run_id": "",
+      "timestamp": "2026-11-02T21:55:34+00:00",
+      "observed_behavior": "",
+      "server_response": "",
+      "detection_source": "UNKNOWN",
+      "evidence": [],
+      "severity": "INFO",
+      "recommendation": "Run the Luau self-test harness for this scenario to produce a result.",
+      "obtained_result": "Not executed yet.",
+      "raw": {}
+    },
+    {
+      "scenario_id": "PRM-003",
+      "status": "PASS",
+      "run_id": "run-2026-11-02-001",
+      "timestamp": "2026-11-02T10:00:15+00:00",
+      "observed_behavior": "Self role-assignment to admin denied. detection_source set to HYPERION but no verifiable Hyperion evidence is attached.",
+      "server_response": "Role unchanged.",
+      "detection_source": "UNKNOWN",
+      "evidence": [
+        "Downgraded detection_source from HYPERION to UNKNOWN: no verifiable evidence provided."
+      ],
+      "severity": "INFO",
+      "recommendation": "No action required. Keep the control under regression testing.",
+      "obtained_result": "Server behaved securely (anomalous input was rejected/corrected).",
+      "raw": {
+        "scenario_id": "PRM-003",
+        "run_id": "run-2026-11-02-001",
+        "timestamp": "2026-11-02T10:00:15+00:00",
+        "server_rejected": true,
+        "detection_source": "HYPERION",
+        "observed": "Self role-assignment to admin denied. detection_source set to HYPERION but no verifiable Hyperion evidence is attached.",
+        "server_response": "Role unchanged.",
+        "evidence": []
+      }
+    }
+  ]
+}
