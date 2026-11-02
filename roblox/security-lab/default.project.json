@@ -1,0 +1,23 @@
+{
+  "name": "SecurityLab",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "SecurityLab": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "SecurityLab": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "SecurityLab": {
+          "$path": "src/client"
+        }
+      }
+    }
+  }
+}
