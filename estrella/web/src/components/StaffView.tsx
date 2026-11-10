@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, Beam, Dot, Articulation, Annotation, Barline, StaveTie, StaveText, Tuplet, Volta } from 'vexflow';
 import { accidentalsFor, staffPosition, placement, measureFill, measureCapacity, noteQuarters, DUR_QUARTERS, STEP_ES, type ScoreDoc, type Note } from '../../../shared/music';
 
@@ -25,6 +25,23 @@ interface Props {
   compact?: boolean;
   /** escribe el nombre de cada nota (Do, Re♯…) debajo */
   noteNames?: boolean;
+  /** alto disponible en píxeles: la partitura entera se ajusta para caber sin desplazarse (ignora `scale`) */
+  fitHeight?: number;
+}
+
+const measureWidth = (m: ScoreDoc['measures'][number]) => Math.max(110, 34 + m.notes.length * 34 + (m.notes.some((n) => n.dots) ? 12 : 0));
+const firstExtra = (doc: ScoreDoc, firstLine: boolean) => 70 + Math.abs(doc.key) * 11 + (firstLine ? 30 : 0);
+/** Reparte los compases en líneas para un ancho dado. */
+function breakLines(doc: ScoreDoc, widths: number[], usable: number): number[][] {
+  const lines: number[][] = [];
+  let cur: number[] = []; let acc = 0;
+  widths.forEach((w, i) => {
+    const extra = cur.length === 0 ? firstExtra(doc, lines.length === 0) : 0;
+    if (cur.length && acc + w + extra > usable - 10) { lines.push(cur); cur = []; acc = 0; }
+    cur.push(i); acc += w + (cur.length === 1 ? firstExtra(doc, lines.length === 0) : 0);
+  });
+  if (cur.length) lines.push(cur);
+  return lines;
 }
 
 function keyOf(n: Note, clef: string) {
@@ -36,15 +53,26 @@ export default function StaffView(p: Props) {
   const host = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
   const [rects, setRects] = useState<MeasureRect[]>([]);
-  const scale = p.scale ?? 1;
+  const fit = p.fitHeight != null;
+  const lineH = fit ? (p.noteNames ? 124 : 104) : p.compact ? 120 : 140;
+  const shown = useMemo(() => p.doc.measures.slice(0, p.maxMeasures ?? p.doc.measures.length), [p.doc, p.maxMeasures]);
+  // modo «marcha completa»: la escala más grande con la que todas las líneas caben en el alto disponible
+  const scale = useMemo(() => {
+    if (!fit) return p.scale ?? 1;
+    const widths = shown.map(measureWidth);
+    for (let s = 1.3; s > 0.3; s -= 0.02) {
+      if ((breakLines(p.doc, widths, width / s).length * lineH + 30) * s <= p.fitHeight!) return s;
+    }
+    return 0.3;
+  }, [fit, p.scale, p.fitHeight, p.doc, shown, width, lineH]);
 
   useLayoutEffect(() => {
     const el = host.current?.parentElement;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(Math.max(300, el.clientWidth - 24)));
+    const ro = new ResizeObserver(() => setWidth(Math.max(300, el.clientWidth - (fit ? 8 : 24))));
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [fit]);
 
   useEffect(() => {
     const div = host.current;
@@ -53,18 +81,9 @@ export default function StaffView(p: Props) {
     const doc = p.doc;
     const renderer = new Renderer(div, Renderer.Backends.SVG);
     const usable = width / scale;
-    const lineH = p.compact ? 120 : 140;
-    const measures = doc.measures.slice(0, p.maxMeasures ?? doc.measures.length);
-    // reparto en líneas
-    const widths = measures.map((m) => Math.max(110, 34 + m.notes.length * 34 + (m.notes.some((n) => n.dots) ? 12 : 0)));
-    const lines: number[][] = [];
-    let cur: number[] = []; let acc = 0;
-    measures.forEach((_, i) => {
-      const extra = cur.length === 0 ? 70 + Math.abs(doc.key) * 11 + (lines.length === 0 ? 30 : 0) : 0;
-      if (cur.length && acc + widths[i] + extra > usable - 10) { lines.push(cur); cur = []; acc = 0; }
-      cur.push(i); acc += widths[i] + (cur.length === 1 ? 70 + Math.abs(doc.key) * 11 + (lines.length === 0 ? 30 : 0) : 0);
-    });
-    if (cur.length) lines.push(cur);
+    const measures = shown;
+    const widths = measures.map(measureWidth);
+    const lines = breakLines(doc, widths, usable);
     const totalH = lines.length * lineH + 30;
     renderer.resize(width, totalH * scale);
     const ctx = renderer.getContext();
@@ -148,7 +167,7 @@ export default function StaffView(p: Props) {
       });
     });
     setRects(out);
-  }, [p.doc, width, p.colorMode, p.selectedNoteId, p.playingNoteId, scale, p.changedNoteIds, p.maxMeasures, p.compact, p.noteNames]);
+  }, [p.doc, width, p.colorMode, p.selectedNoteId, p.playingNoteId, scale, p.changedNoteIds, shown, lineH, p.noteNames]);
 
   const click = (e: React.MouseEvent) => {
     const g = (e.target as Element).closest('.vf-stavenote');
@@ -167,8 +186,8 @@ export default function StaffView(p: Props) {
 
   const hl = (pred: (r: MeasureRect) => boolean, style: React.CSSProperties, key: string, label?: (r: MeasureRect) => string) =>
     rects.filter(pred).map((r) => (
-      <div key={key + r.id} style={{ position: 'absolute', left: r.x * scale - 4, top: r.y * scale - 14, width: r.w * scale, height: r.h * scale + 10, borderRadius: 8, pointerEvents: 'none', transition: 'all .25s', ...style }} data-testid={key === 'cur' ? 'score-measure-highlight' : undefined}>
-        {label && <span style={{ position: 'absolute', top: -18, left: 0, fontSize: 11, fontWeight: 700, background: style.borderColor as string, color: '#fff', borderRadius: 6, padding: '0 6px' }}>{label(r)}</span>}
+      <div key={key + r.id} style={{ position: 'absolute', left: r.x * scale - 4, top: r.y * scale - (fit ? 4 : 14), width: r.w * scale, height: r.h * scale + (fit ? 0 : 10), borderRadius: fit ? 6 : 8, pointerEvents: 'none', transition: 'all .25s', ...style }} data-testid={key === 'cur' ? 'score-measure-highlight' : undefined}>
+        {label && !fit && <span style={{ position: 'absolute', top: -18, left: 0, fontSize: 11, fontWeight: 700, background: style.borderColor as string, color: '#fff', borderRadius: 6, padding: '0 6px' }}>{label(r)}</span>}
       </div>
     ));
 
@@ -177,8 +196,8 @@ export default function StaffView(p: Props) {
       <div ref={host} onClick={click} style={{ cursor: p.onNoteClick ? 'pointer' : 'default' }} />
       {p.loop && hl((r) => r.n >= p.loop!.from && r.n <= p.loop!.to, { background: 'rgba(168,85,247,.08)', border: '2px dashed #a855f7' }, 'loop')}
       {p.selectedMeasureId && hl((r) => r.id === p.selectedMeasureId, { border: '2px solid #c9a227', background: 'rgba(201,162,39,.08)' }, 'sel')}
-      {p.currentMeasure != null && hl((r) => r.n === p.currentMeasure, { border: '3px solid #c9a227', background: 'rgba(201,162,39,.14)', borderColor: '#c9a227' }, 'cur', (r) => `Compás ${r.n}`)}
-      {!p.compact && hl((r) => !!(r as any).bad, { borderBottom: '3px solid #ef4444' }, 'bad')}
+      {p.currentMeasure != null && hl((r) => r.n === p.currentMeasure, { border: `${fit ? 2 : 3}px solid #c9a227`, background: 'rgba(201,162,39,.14)', borderColor: '#c9a227' }, 'cur', (r) => `Compás ${r.n}`)}
+      {!p.compact && !fit && hl((r) => !!(r as any).bad, { borderBottom: '3px solid #ef4444' }, 'bad')}
     </div>
   );
 }
