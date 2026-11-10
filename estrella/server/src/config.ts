@@ -44,7 +44,7 @@ export const config = {
   storageMode: (env.STORAGE_MODE === 'db' ? 'db' : 'disk') as 'db' | 'disk',
   seedDemo: env.SEED_DEMO === '1',
   maxUploadMb: Number(env.MAX_UPLOAD_MB || 60),
-  sessionDays: 30,
+  sessionDays: 365, // se renueva sola con el uso: un dispositivo que se usa no vuelve a pedir la contraseña
   anthropicKey: env.ANTHROPIC_API_KEY || '',
   anthropicModel: env.ANTHROPIC_MODEL || 'claude-opus-5-5',
   audiverisPath: env.AUDIVERIS_PATH || '',

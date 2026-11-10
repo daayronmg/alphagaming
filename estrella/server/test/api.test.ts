@@ -76,6 +76,23 @@ test('convocatoria por correo: los botones Voy / No voy confirman sin sesión y 
   assert.equal((await fetch(`${base}/rsvp/${forged}`, { method: 'POST' })).status, 404);
 });
 
+test('la sesión se alarga sola con el uso: el dispositivo no vuelve a pedir la contraseña', async () => {
+  const r = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ email: 'componente.d@estrella.demo', password: DEMO_PASSWORD }) });
+  const cookie = r.headers.get('set-cookie')!.split(';')[0];
+  const uid = (await pool.query(`select id from users where email = 'componente.d@estrella.demo'`)).rows[0].id;
+  // recién iniciada no se renueva en cada petición
+  assert.equal((await fetch(`${base}/auth/me`, { headers: { cookie } })).headers.get('set-cookie'), null);
+  // como si llevara meses abierta: le quedan 10 días
+  await pool.query(`update sessions set expires_at = now() + interval '10 days' where user_id = $1`, [uid]);
+  const { forgetUser } = await import('../src/lib/auth.ts'); forgetUser(uid);
+  const again = await fetch(`${base}/auth/me`, { headers: { cookie } });
+  assert.equal(again.status, 200);
+  assert.match(again.headers.get('set-cookie') ?? '', /Expires=/);
+  await new Promise((ok) => setTimeout(ok, 200));
+  const days = (await pool.query(`select extract(epoch from expires_at - now()) / 86400 as d from sessions where user_id = $1`, [uid])).rows[0].d;
+  assert.ok(Number(days) > 360, `quedan ${days} días`);
+});
+
 test('asignación automática: cada componente recibe su parte y nunca otra voz', async () => {
   const a = await login('componente.a@estrella.demo');
   const b = await login('componente.b@estrella.demo');
