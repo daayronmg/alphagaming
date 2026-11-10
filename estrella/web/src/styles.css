@@ -407,6 +407,23 @@ button.march-row { width: 100%; background: none; border: 0; border-bottom: 1px 
 .live-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); font-weight: 650; font-size: .82rem; }
 .live-body { flex: 1; padding: 16px 16px calc(24px + var(--safe-b)); max-width: 1180px; width: 100%; margin: 0 auto; }
 @media (min-width: 700px) { .live-body { padding: 24px 28px 32px; } }
+/* directo en móvil: partitura a pantalla completa y mandos en una barra fija abajo */
+.live-play { display: flex; flex-direction: column; gap: 10px; padding-bottom: calc(84px + var(--safe-b)); }
+.live-title h1 { font-size: 1.35rem; line-height: 1.15; margin: 0; }
+.live-score { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 8px 4px 10px; overflow: hidden; }
+.live-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; align-items: center; gap: 8px; overflow-x: auto;
+  padding: 10px max(12px, var(--safe-l, 0px)) calc(10px + var(--safe-b)); background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-top: 1px solid var(--line); scrollbar-width: none; }
+.live-dock::-webkit-scrollbar { display: none; }
+.live-play-btn { flex: 1 1 auto; min-height: 54px; min-width: 0; justify-content: center; font-size: 1.05rem; font-weight: 750; }
+.live-chip-btn { flex: none; min-height: 44px; padding: 0 14px; font-size: .9rem; gap: 6px; }
+.live-play-btn svg, .live-chip-btn svg { flex: none; }
+@media (max-width: 430px) { .live-dock { gap: 6px; } .live-chip-btn { padding: 0 11px; font-size: .84rem; } .live-chip-btn .lucide { display: none; } }
+@media (min-width: 700px) { .live-dock { left: 50%; right: auto; transform: translateX(-50%); bottom: 16px; border: 1px solid var(--line); border-radius: 999px; padding: 8px; box-shadow: 0 18px 40px -20px rgba(0,0,0,.35); max-width: calc(100vw - 32px); }
+  .live-play-btn { min-width: 200px; } .live-title h1 { font-size: 1.8rem; } }
+/* en el directo la cabecera y el margen se reducen en móvil, sobre todo en horizontal */
+@media (max-width: 699px) { .live-body { padding: 10px 10px 0; } }
+@media (max-height: 480px) { .live-bar { padding-top: calc(4px + var(--safe-t)); padding-bottom: 4px; } .live-title h1 { font-size: 1.05rem; } .live-title .small { display: none; } .live-play { gap: 6px; } .live-play-btn { min-height: 44px; } .live-body { padding-top: 6px; } }
 .live-wait { flex: 1; min-height: 70dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; padding: 24px; }
 .live-pulse { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); animation: livePulse 1.6s infinite; }
 @keyframes livePulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 35%, transparent); } 100% { box-shadow: 0 0 0 22px transparent; } }
