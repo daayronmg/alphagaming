@@ -6,6 +6,7 @@ import { h, parse, HttpError } from '../lib/http.ts';
 import { requireAuth, requirePerm } from '../lib/auth.ts';
 import { upload, storeFile } from '../lib/files.ts';
 import { hub } from '../realtime.ts';
+import { sendNewMarchasMail } from '../lib/rsvpMail.ts';
 import { userAssignments, type Assignment } from './members.ts';
 
 export const libraryRouter = Router();
@@ -127,7 +128,7 @@ libraryRouter.get('/marchas/:id', h(async (req, res) => {
  */
 libraryRouter.get('/marchas/:id/play', h(async (req, res) => {
   const [m, scores, recordings, mine] = await Promise.all([
-    one<any>('select id, title, composer, is_demo from marchas where id = $1', [req.params.id]),
+    one<any>('select id, title, composer, is_demo, how_url from marchas where id = $1', [req.params.id]),
     q(`select s.id, s.label, s.instrument_id, s.voice_id, s.published_version_id, (s.draft is not null) as has_draft from scores s
        left join instruments i on i.id = s.instrument_id left join voices v on v.id = s.voice_id where s.marcha_id = $1 order by i.sort, v.sort`, [req.params.id]),
     q(`select r.id, r.file_id, r.label, r.kind from recordings r where r.marcha_id = $1 order by r.created_at`, [req.params.id]),
@@ -140,6 +141,8 @@ libraryRouter.get('/marchas/:id/play', h(async (req, res) => {
 
 const marchaBody = z.object({
   title: z.string().min(1).max(200),
+  // «Cómo se toca»: enlace a un vídeo o audio de referencia
+  how_url: z.string().url().max(500).regex(/^https:\/\//, 'El enlace debe empezar por https://').nullable().optional(),
   composer: z.string().max(200).nullable().optional(),
   year: z.number().int().min(1500).max(2100).nullable().optional(),
   duration_sec: z.number().int().min(0).max(7200).nullable().optional(),
@@ -152,7 +155,7 @@ const marchaBody = z.object({
   last_reviewed_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   tags: z.array(z.string().min(1).max(40)).max(20).optional(),
 });
-const FIELDS = ['title', 'composer', 'year', 'duration_sec', 'march_type', 'instrumentation', 'measures', 'director_notes', 'difficulty', 'folder_id', 'last_reviewed_at'] as const;
+const FIELDS = ['title', 'composer', 'year', 'duration_sec', 'march_type', 'instrumentation', 'measures', 'director_notes', 'difficulty', 'folder_id', 'last_reviewed_at', 'how_url'] as const;
 
 async function setTags(marchaId: string, tags: string[], db: Db) {
   await q('delete from marcha_tags where marcha_id = $1', [marchaId], db);
@@ -308,6 +311,8 @@ libraryRouter.post('/import-book', manage, upload.single('file'), h(async (req, 
   });
   for (const r of results) hub.toAll({ t: 'parts:changed', marchaId: r.marcha_id, replaces: r.replaces });
   res.json({ results });
+  // por correo, a quienes tocan ese instrumento y voz: las marchas que estrenan parte
+  sendNewMarchasMail(b.instrument_id, b.voice_id ?? null, results.filter((r: any) => r.status !== 'nueva_version').map((r: any) => r.title)).catch((x) => console.error('[correo]', x));
 }));
 
 libraryRouter.get('/parts/:id', h(async (req, res) => {

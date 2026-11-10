@@ -6,7 +6,7 @@ import { h, parse, HttpError } from '../lib/http.ts';
 import { requireAuth, requirePerm, can, sectionsWith, isStaff, randomToken, type AuthUser } from '../lib/auth.ts';
 import { hub } from '../realtime.ts';
 import { toCsv } from '../lib/csv.ts';
-import { sendRsvpInvites } from '../lib/rsvpMail.ts';
+import { sendRsvpInvites, sendEventChange } from '../lib/rsvpMail.ts';
 
 export const eventsRouter = Router();
 eventsRouter.use(requireAuth);
@@ -125,6 +125,8 @@ eventsRouter.put('/:id', manage, h(async (req, res) => {
   }
   hub.toAll({ t: 'events:changed', eventId: req.params.id });
   res.json({ ok: true });
+  // por correo: cualquier cambio de día, hora o lugar, o la cancelación
+  if (changed && old.status === 'programado') sendEventChange(req.params.id, b.status === 'cancelado').catch((x) => console.error('[correo]', x));
 }));
 
 eventsRouter.delete('/:id', manage, h(async (req, res) => {

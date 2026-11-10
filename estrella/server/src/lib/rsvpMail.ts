@@ -149,3 +149,61 @@ rsvpLinkRouter.post('/:token', async (req, res) => {
     ? `<h1>¡Apuntado! ✓</h1><p>Has confirmado que vas a <b>${esc(x.e.title)}</b>. Te esperamos.</p><a class="btn light" href="/">Abrir la app</a>`
     : `<h1>Recibido</h1><p>La dirección ya sabe que no puedes ir a <b>${esc(x.e.title)}</b> (${esc(reason!)}).</p><a class="btn light" href="/">Abrir la app</a>`));
 });
+
+// ===== Correos de todo lo demás que pasa: cambios de un ensayo, avisos y marchas nuevas =====
+function noticeHtml(p: { first: string; kicker: string; title: string; body: string; button?: { href: string; label: string }; danger?: boolean }) {
+  return `<!doctype html><html><body style="margin:0;background:#f5f4f1;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0a0a0a">
+<div style="max-width:520px;margin:0 auto;padding:28px 16px">
+  <div style="text-align:center;margin-bottom:18px"><img src="${config.publicUrl}/logo-256.webp" width="72" height="72" alt="" style="display:inline-block"><div style="font-weight:800;letter-spacing:-.5px;font-size:18px;margin-top:6px">${esc(config.appName)}</div></div>
+  <div style="background:#fff;border:1px solid ${p.danger ? '#f1b4b4' : '#e6e3de'};border-radius:20px;padding:24px">
+    <p style="margin:0 0 6px;color:${p.danger ? '#b91c1c' : '#6b6b6b'};font-weight:${p.danger ? 700 : 400}">${esc(p.kicker)}</p>
+    <h1 style="margin:0 0 12px;font-size:24px;letter-spacing:-.5px">${esc(p.title)}</h1>
+    <p style="margin:0;font-size:15px;line-height:1.5;color:#333;white-space:pre-line">${esc(p.body)}</p>
+    ${p.button ? `<a href="${p.button.href}" style="display:inline-block;margin-top:20px;padding:14px 26px;border-radius:999px;font-weight:700;font-size:16px;text-decoration:none;background:#0a0a0a;color:#fff">${esc(p.button.label)}</a>` : ''}
+  </div>
+  <p style="text-align:center;font-size:12px;color:#8a867f;margin-top:16px">Hola ${esc(p.first)}, este correo te lo manda la banda desde <a href="${config.publicUrl}" style="color:#8a867f">${esc(config.publicUrl.replace(/^https?:\/\//, ''))}</a></p>
+</div></body></html>`;
+}
+
+/** Manda el mismo aviso a una lista de componentes (solo a quien tiene correo real). */
+async function mailUsers(userIds: string[], subject: string, p: { kicker: string; title: string; body: string; button?: { href: string; label: string }; danger?: boolean }) {
+  if (!config.smtpUrl || !userIds.length) return 0;
+  const users = await q<any>(`select name, email from users where id = any($1) and status = 'active'`, [userIds]);
+  let sent = 0;
+  for (const u of users.filter((x) => realEmail(x.email))) {
+    const first = u.name.split(' ')[0];
+    const text = `Hola ${first}:\n\n${p.kicker}\n${p.title}\n\n${p.body}\n${p.button ? `\n${p.button.label}: ${p.button.href}\n` : ''}`;
+    if (await sendMail(u.email, subject, text, noticeHtml({ first, ...p }))) sent++;
+  }
+  if (sent) console.log(`[correo] ${subject}: ${sent} enviados`);
+  return sent;
+}
+
+/** Un ensayo o actuación cambia de día, hora o lugar, o se cancela. */
+export async function sendEventChange(eventId: string, cancelled: boolean) {
+  const e = await one<any>(`select id, title, starts_at, call_at, location from events where id = $1`, [eventId]);
+  if (!e || new Date(e.starts_at) < new Date()) return 0;
+  const ids = (await convokedMembers(eventId)).map((m) => m.id);
+  const start = new Date(e.starts_at);
+  const when = `${fmtDay(start)}, ${e.call_at ? `citación a las ${fmtTime(new Date(e.call_at))}` : `a las ${fmtTime(start)}`}${e.location ? `\nLugar: ${e.location}` : ''}`;
+  return cancelled
+    ? mailUsers(ids, `CANCELADO: ${e.title} · ${fmtDay(start)}`, { kicker: 'Se ha cancelado', title: e.title, body: `Estaba previsto para el ${when}.`, danger: true })
+    : mailUsers(ids, `Cambio: ${e.title} · ${fmtDay(start)}`, { kicker: 'Ha cambiado', title: e.title, body: `Ahora es el ${when}.\n\nSi con el cambio ya no puedes ir, dilo en la app.`, button: { href: config.publicUrl, label: 'Abrir la app' }, danger: true });
+}
+
+/** Un aviso de la dirección, a toda la banda o a sus secciones. */
+export async function sendAnnouncementMail(a: { title: string; body: string; urgent: boolean; section_ids: number[] }, author: string) {
+  const rows = await q<any>(`select distinct u.id from users u left join user_assignments ua on ua.user_id = u.id left join instruments i on i.id = ua.instrument_id
+    where u.status = 'active' and (cardinality($1::int[]) = 0 or i.section_id = any($1))`, [a.section_ids]);
+  return mailUsers(rows.map((r) => r.id), `${a.urgent ? 'URGENTE: ' : 'Aviso: '}${a.title}`,
+    { kicker: a.urgent ? `Aviso urgente de ${author}` : `Aviso de ${author}`, title: a.title, body: a.body, button: { href: `${config.publicUrl}/avisos`, label: 'Ver en la app' }, danger: a.urgent });
+}
+
+/** Marchas nuevas para un instrumento y voz: se avisa a quienes lo tocan. */
+export async function sendNewMarchasMail(instrumentId: number, voiceId: number | null, titles: string[]) {
+  if (!titles.length) return 0;
+  const rows = await q<any>(`select distinct user_id as id from user_assignments where instrument_id = $1 and ($2::int is null or voice_id is null or voice_id = $2)`, [instrumentId, voiceId]);
+  const list = titles.slice(0, 12).map((t) => `· ${t}`).join('\n') + (titles.length > 12 ? `\n… y ${titles.length - 12} más` : '');
+  return mailUsers(rows.map((r) => r.id), titles.length === 1 ? `Marcha nueva: ${titles[0]}` : `${titles.length} marchas nuevas`,
+    { kicker: 'Ya puedes verla y escucharla', title: titles.length === 1 ? titles[0] : `${titles.length} marchas nuevas`, body: titles.length === 1 ? 'Tu parte ya está en la app.' : `Tu parte de estas marchas ya está en la app:\n\n${list}`, button: { href: config.publicUrl, label: 'Abrir mis marchas' } });
+}

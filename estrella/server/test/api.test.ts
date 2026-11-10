@@ -93,6 +93,18 @@ test('la sesión se alarga sola con el uso: el dispositivo no vuelve a pedir la 
   assert.ok(Number(days) > 360, `quedan ${days} días`);
 });
 
+test('«Cómo se toca»: la dirección guarda el enlace y los músicos lo reciben; un componente no puede cambiarlo', async () => {
+  const emilio = await login('emilio@estrella.demo');
+  const a = await login('componente.a@estrella.demo');
+  const id = (await emilio('/library/marchas')).data[0].id;
+  assert.equal((await emilio(`/library/marchas/${id}`, 'PUT', { how_url: 'http://sin-cifrar.example/v' })).status, 400);
+  assert.equal((await a(`/library/marchas/${id}`, 'PUT', { how_url: 'https://youtu.be/dQw4w9WgXcQ' })).status, 403);
+  assert.equal((await emilio(`/library/marchas/${id}`, 'PUT', { how_url: 'https://youtu.be/dQw4w9WgXcQ' })).status, 200);
+  assert.equal((await a(`/library/marchas/${id}/play`)).data.how_url, 'https://youtu.be/dQw4w9WgXcQ');
+  assert.equal((await emilio(`/library/marchas/${id}`, 'PUT', { how_url: null })).status, 200);
+  assert.equal((await a(`/library/marchas/${id}/play`)).data.how_url, null);
+});
+
 test('asignación automática: cada componente recibe su parte y nunca otra voz', async () => {
   const a = await login('componente.a@estrella.demo');
   const b = await login('componente.b@estrella.demo');

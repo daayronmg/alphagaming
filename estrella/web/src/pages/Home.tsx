@@ -32,7 +32,8 @@ export default function Home() {
   const director = can('live.direct');
   const upcoming = (events.data ?? []).filter((e) => e.status === 'programado' && e.convoked);
   const next = upcoming[0];
-  const later = upcoming.slice(1, 4);
+  const rehearsals = upcoming.filter((e) => e.type === 'ensayo').slice(0, 6);
+  const shows = upcoming.filter((e) => e.type !== 'ensayo').slice(0, 6);
   const session = live.data?.[0];
   const list = (marchas.data ?? []).filter((m) => !m.is_demo || (marchas.data ?? []).every((x) => x.is_demo))
     .filter((m) => !q || norm(m.title).includes(norm(q)) || norm(m.composer ?? '').includes(norm(q)));
@@ -91,44 +92,54 @@ export default function Home() {
         </Link>
       )}
 
-      {/* 2. Próximo ensayo o actuación: voy / no voy */}
+      {/* 2. Agenda: tus ensayos y las próximas actuaciones, cada uno con su voy / no voy */}
       {next ? (
-        <div className="card stack" data-testid="home-next">
-          <div className="row between">
-            <div>
-              <div className="eyebrow">{isToday(next.starts_at) ? 'Hoy' : 'Próximo'} · {EVENT_TYPES[next.type]}</div>
-              <h2 style={{ marginTop: 4 }}>{next.title}</h2>
-              <div className="row small muted" style={{ marginTop: 6, gap: 14 }}>
-                <span className="row" style={{ gap: 4 }}><CalendarDays size={15} /> {bigDate(next.starts_at)}</span>
-                <span className="row" style={{ gap: 4 }}><Clock size={15} /> {next.call_at ? `citación ${fmtTime(next.call_at)}` : fmtTime(next.starts_at)}</span>
-                {next.location && <span className="row" style={{ gap: 4 }}><MapPin size={15} /> {next.location}</span>}
-              </div>
-              {next.last_minute && <div className="small" style={{ color: 'var(--danger)', fontWeight: 650, marginTop: 6 }}>⚠ {next.last_minute}</div>}
-            </div>
-            <Link to={`/eventos/${next.id}`} className="btn ghost sm">Detalles <ChevronRight size={16} /></Link>
-          </div>
-          {next.status === 'programado' && (
-            <>
-              {next.my_rsvp && <div className={`rsvp-state ${next.my_rsvp}`}>{next.my_rsvp === 'asistire' ? '✅ Has dicho que vas' : '❌ Has dicho que no vas'}</div>}
-              <div className="rsvp-buttons">
-                <button className={`btn lg yes ${next.my_rsvp === 'asistire' ? 'on' : ''}`} onClick={() => answer(next, 'asistire')} data-testid="rsvp-yes"><Check size={22} /> Voy</button>
-                <button className={`btn lg no ${next.my_rsvp === 'no_asistire' ? 'on' : ''}`} onClick={() => setAbsent(next)} data-testid="rsvp-no"><X size={22} /> No voy</button>
-              </div>
-            </>
-          )}
-          {director && <RsvpSummary eventId={next.id} />}
-          {later.length > 0 && (
-            <div className="stack sm">
-              <div className="xs faint">Después</div>
-              {later.map((e) => (
-                <Link key={e.id} to={`/eventos/${e.id}`} className="list-item" style={{ padding: 8 }}>
-                  <span className="small grow"><strong>{bigDate(e.starts_at)}</strong> · {e.title}</span>
-                  {e.my_rsvp ? <span className={`badge ${e.my_rsvp === 'asistire' ? 'ok' : 'danger'}`}>{e.my_rsvp === 'asistire' ? 'Voy' : 'No voy'}</span> : <span className="badge warn">Sin responder</span>}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+        <>
+          {[['Tus ensayos', rehearsals] as const, ['Próximas actuaciones', shows] as const].filter(([, items]) => items.length > 0).map(([title, items]) => (
+            <section key={title} className="stack sm" data-testid="agenda">
+              <div className="row between"><h3 className="agenda-title">{title}</h3><Link to="/calendario" className="xs faint">Ver calendario</Link></div>
+              {items.map((e) => (e.id === next.id ? (
+                <div key={e.id} className="card stack" data-testid="home-next">
+                  <div className="row between">
+                    <div>
+                      <div className="eyebrow">{isToday(e.starts_at) ? 'Hoy' : 'Próximo'} · {EVENT_TYPES[e.type]}</div>
+                      <h2 style={{ marginTop: 4 }}>{e.title}</h2>
+                      <div className="row small muted" style={{ marginTop: 6, gap: 14 }}>
+                        <span className="row" style={{ gap: 4 }}><CalendarDays size={15} /> {bigDate(e.starts_at)}</span>
+                        <span className="row" style={{ gap: 4 }}><Clock size={15} /> {e.call_at ? `citación ${fmtTime(e.call_at)}` : fmtTime(e.starts_at)}</span>
+                        {e.location && <span className="row" style={{ gap: 4 }}><MapPin size={15} /> {e.location}</span>}
+                      </div>
+                      {e.last_minute && <div className="small" style={{ color: 'var(--danger)', fontWeight: 650, marginTop: 6 }}>⚠ {e.last_minute}</div>}
+                    </div>
+                    <Link to={`/eventos/${e.id}`} className="btn ghost sm">Detalles <ChevronRight size={16} /></Link>
+                  </div>
+                  {e.my_rsvp && <div className={`rsvp-state ${e.my_rsvp}`}>{e.my_rsvp === 'asistire' ? '✅ Has dicho que vas' : '❌ Has dicho que no vas'}</div>}
+                  <div className="rsvp-buttons">
+                    <button className={`btn lg yes ${e.my_rsvp === 'asistire' ? 'on' : ''}`} onClick={() => answer(e, 'asistire')} data-testid="rsvp-yes"><Check size={22} /> Voy</button>
+                    <button className={`btn lg no ${e.my_rsvp === 'no_asistire' ? 'on' : ''}`} onClick={() => setAbsent(e)} data-testid="rsvp-no"><X size={22} /> No voy</button>
+                  </div>
+                  {director && <RsvpSummary eventId={e.id} />}
+                </div>
+              ) : (
+                <div key={e.id} className="card agenda-item">
+                  <Link to={`/eventos/${e.id}`} className="agenda-date" aria-label="Detalles">
+                    <b>{new Date(e.starts_at).getDate()}</b><span>{new Date(e.starts_at).toLocaleDateString('es-ES', { month: 'short' }).replace('.', '')}</span>
+                  </Link>
+                  <Link to={`/eventos/${e.id}`} className="grow agenda-info">
+                    <strong className="ellipsis">{e.title}</strong>
+                    <span className="small muted ellipsis">{new Date(e.starts_at).toLocaleDateString('es-ES', { weekday: 'long' })} · {e.call_at ? `citación ${fmtTime(e.call_at)}` : fmtTime(e.starts_at)}{e.location ? ` · ${e.location}` : ''}</span>
+                    {e.last_minute && <span className="xs" style={{ color: 'var(--danger)', fontWeight: 650 }}>⚠ {e.last_minute}</span>}
+                    {!e.my_rsvp && <span className="xs" style={{ color: 'var(--warn, #b45309)', fontWeight: 650 }}>Sin responder</span>}
+                  </Link>
+                  <div className="agenda-rsvp">
+                    <button className={`btn yes ${e.my_rsvp === 'asistire' ? 'on' : ''}`} onClick={() => answer(e, 'asistire')} aria-label={`Voy a ${e.title}`}><Check size={18} /> Voy</button>
+                    <button className={`btn no ${e.my_rsvp === 'no_asistire' ? 'on' : ''}`} onClick={() => setAbsent(e)} aria-label={`No voy a ${e.title}`}><X size={18} /> No voy</button>
+                  </div>
+                </div>
+              )))}
+            </section>
+          ))}
+        </>
       ) : (
         <div className="card"><div className="row"><CalendarDays size={20} className="faint" /><span className="muted">No hay ensayos ni actuaciones próximas.</span></div></div>
       )}

@@ -1,15 +1,64 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Play, Square, FileText, ChevronLeft, Info, Wand2, Gauge, Pencil, Maximize, Minimize, RotateCw } from '../components/icons';
-import { get, post } from '../lib/api';
+import { Play, Square, FileText, ChevronLeft, Info, Wand2, Gauge, Pencil, Maximize, Minimize, RotateCw, Video } from '../components/icons';
+import { get, post, put } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { useLoad, Spinner, ErrorBox, Notice, useToast } from '../components/ui';
+import { useLoad, Spinner, ErrorBox, Notice, useToast, Modal, Field } from '../components/ui';
 import StaffView from '../components/StaffView';
 import AudioPlayer from '../components/AudioPlayer';
 import { playScores, unlockAudio, type ScorePlayback } from '../lib/audio';
 import { transcribePdf } from '../lib/pdf';
 import { useRealtime } from '../lib/realtime';
 import type { ScoreDoc } from '../../../shared/music';
+
+/** Identificador de un vídeo de YouTube a partir de cualquiera de sus enlaces habituales. */
+export function youtubeId(url: string): string | null {
+  const m = /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/))([\w-]{11})/.exec(url);
+  return m ? m[1] : null;
+}
+
+/** «Cómo se toca»: vídeo o audio de referencia de la marcha. La dirección pega el enlace; los músicos lo ven sin salir de la app. */
+function HowTo({ marcha, canEdit, onSaved }: { marcha: any; canEdit: boolean; onSaved: () => void }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [url, setUrl] = useState(marcha.how_url ?? '');
+  useEffect(() => setUrl(marcha.how_url ?? ''), [marcha.how_url]);
+  const yt = marcha.how_url ? youtubeId(marcha.how_url) : null;
+  const has = !!marcha.how_url || marcha.recordings.length > 0;
+  if (!has && !canEdit) return null;
+  const save = async () => {
+    const v = url.trim();
+    if (v && !/^https:\/\//.test(v)) return toast({ kind: 'error', text: 'Pega el enlace completo, empezando por https://' });
+    try { await put(`/library/marchas/${marcha.id}`, { how_url: v || null }); toast({ kind: 'ok', text: v ? 'Guardado: ya lo ven todos.' : 'Enlace quitado.' }); setEditing(false); onSaved(); }
+    catch (e) { toast({ kind: 'error', text: (e as Error).message }); }
+  };
+  return (
+    <>
+      <button className="btn how-btn" onClick={() => (has ? setOpen(true) : setEditing(true))} data-testid="how-to">
+        <Video size={18} /> {has ? 'Cómo se toca' : 'Añadir «Cómo se toca»'}
+      </button>
+      {open && (
+        <Modal title={`Cómo se toca · ${marcha.title}`} onClose={() => setOpen(false)}>
+          <div className="stack">
+            {yt && <div className="how-video"><iframe src={`https://www.youtube-nocookie.com/embed/${yt}?rel=0&playsinline=1`} title="Cómo se toca" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen /></div>}
+            {marcha.how_url && !yt && <a className="btn primary lg" href={marcha.how_url} target="_blank" rel="noopener noreferrer"><Play size={20} /> Abrir el vídeo o audio</a>}
+            {marcha.recordings.length > 0 && <AudioPlayer tracks={marcha.recordings} storageKey={marcha.id} />}
+            {canEdit && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => { setOpen(false); setEditing(true); }}><Pencil size={15} /> Cambiar el enlace</button>}
+          </div>
+        </Modal>
+      )}
+      {editing && (
+        <Modal title="Cómo se toca esta marcha" onClose={() => setEditing(false)} footer={<><button className="btn" onClick={() => setEditing(false)}>Cancelar</button><button className="btn primary" onClick={save} data-testid="how-save">Guardar</button></>}>
+          <div className="stack">
+            <p className="small muted">Pega el enlace de un vídeo de YouTube (o de cualquier vídeo o audio) donde se oiga cómo se toca. Los componentes lo verán dentro de la app.</p>
+            <Field label="Enlace"><input className="input" type="url" inputMode="url" placeholder="https://youtu.be/…" value={url} onChange={(e) => setUrl(e.target.value)} /></Field>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
 
 function useMedia(query: string) {
   const [on, setOn] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
@@ -165,7 +214,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
             {published.map((p) => <option key={p.id} value={p.id}>{p.label}{p.id === mine.score?.id ? ' (la tuya)' : ''}</option>)}
           </select>
         )}
-        {turnHint}
+        <div className="row" style={{ gap: 8 }}>{turnHint}<HowTo marcha={x} canEdit={false} onSaved={m.reload} /></div>
         <div className="live-score" ref={staffBox}>
           <StaffView doc={doc} colorMode noteNames={names} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.82 : 1} />
           <p className="xs faint" style={{ margin: '10px 4px 0' }}>
@@ -225,6 +274,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
             <label className="checkbox"><input type="checkbox" checked={metro} onChange={(e) => { setMetro(e.target.checked); if (playing) stop(); }} /> Metrónomo</label>
             {mine.part && <Link className="btn sm" to={`/partitura/${mine.part.id}`}><FileText size={15} /> Partitura original</Link>}
           </div>
+          <HowTo marcha={x} canEdit={can('library.manage')} onSaved={m.reload} />
         </div>
       ) : mine.part ? (
         <div className="card stack">
