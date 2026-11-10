@@ -5,6 +5,7 @@ import { h, parse, HttpError } from '../lib/http.ts';
 import { requireAuth, can, sectionsWith, isStaff, type AuthUser } from '../lib/auth.ts';
 import { upload, storeFile } from '../lib/files.ts';
 import { hub } from '../realtime.ts';
+import { sendAnnouncementMail } from '../lib/rsvpMail.ts';
 
 export const commsRouter = Router();
 commsRouter.use(requireAuth);
@@ -33,6 +34,7 @@ commsRouter.post('/announcements', h(async (req, res) => {
     [b.title, b.body, b.urgent, b.urgent && b.category === 'aviso' ? 'direccion' : b.category, b.section_ids, user.id, b.expires_at ?? null]);
   hub.toAll({ t: 'announcement', announcement: { ...a, author_name: user.name } }, (c) => targets(c.user, a.section_ids) || c.user.id === user.id);
   res.json(a);
+  sendAnnouncementMail(a, user.name).catch((x) => console.error('[correo]', x));
 }));
 
 commsRouter.post('/announcements/:id/read', h(async (req, res) => {
