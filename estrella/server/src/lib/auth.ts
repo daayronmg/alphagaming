@@ -72,12 +72,12 @@ const sessionCache = new Map<string, { at: number; user: AuthUser; lastSeen: num
 export function forgetSession(sid: string) { sessionCache.delete(sid); }
 export function forgetUser(userId: string) { for (const [k, v] of sessionCache) if (v.user.id === userId) sessionCache.delete(k); }
 
-export async function userFromToken(token: string | undefined): Promise<{ user: AuthUser; sid: string } | undefined> {
+export async function userFromToken(token: string | undefined): Promise<{ user: AuthUser; sid: string; renew?: boolean } | undefined> {
   if (!token) return undefined;
   const sid = sha256(token);
   const hit = sessionCache.get(sid);
   if (hit && Date.now() - hit.at < SESSION_TTL) return { user: hit.user, sid };
-  const s = await one<any>('select user_id, last_seen_at from sessions where id = $1 and expires_at > now()', [sid]);
+  const s = await one<any>('select user_id, last_seen_at, expires_at from sessions where id = $1 and expires_at > now()', [sid]);
   if (!s) { sessionCache.delete(sid); return undefined; }
   const user = await loadUserById(s.user_id);
   if (!user) return undefined;
@@ -86,13 +86,21 @@ export async function userFromToken(token: string | undefined): Promise<{ user: 
   if (Date.now() - new Date(s.last_seen_at).getTime() > 5 * 60_000) {
     q('update sessions set last_seen_at = now() where id = $1', [sid]).catch(() => {});
   }
-  return { user, sid };
+  // la sesión se alarga sola con el uso (como mucho una vez al día): el dispositivo no vuelve a pedir la contraseña
+  const renew = new Date(s.expires_at).getTime() - Date.now() < (config.sessionDays - 1) * 864e5;
+  return { user, sid, renew };
 }
 
-export async function authMiddleware(req: Request, _res: Response, next: NextFunction) {
+export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   try {
-    const r = await userFromToken(req.cookies?.[COOKIE]);
+    const token = req.cookies?.[COOKIE];
+    const r = await userFromToken(token);
     if (r) { req.user = r.user; req.sessionId = r.sid; }
+    if (r?.renew) {
+      const expires = new Date(Date.now() + config.sessionDays * 864e5);
+      q('update sessions set expires_at = $2 where id = $1', [r.sid, expires]).catch(() => {});
+      res.cookie(COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: config.production, expires, path: '/' });
+    }
     next();
   } catch (e) { next(e); }
 }
