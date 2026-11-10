@@ -83,6 +83,40 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
     } catch (e) { toast({ kind: 'error', text: (e as Error).message }); } finally { setBusy(false); }
   };
 
+  // ensayo en directo: la partitura ocupa la pantalla y los mandos van en una barra fija abajo (a mano del pulgar)
+  if (embedded && doc) {
+    const speeds = [100, 90, 80, 70, 60];
+    const nextSpeed = () => { setSpeed(speeds[(speeds.indexOf(speed) + 1) % speeds.length] ?? 100); if (playing) stop(); };
+    return (
+      <div className="live-play">
+        <div className="live-title">
+          <h1>{x.title}</h1>
+          <div className="small muted ellipsis">{mine.assignment ? `Tu parte: ${mine.assignment.instrument}${mine.assignment.voice ? ` ${mine.assignment.voice}` : ''}` : x.composer || ''}</div>
+        </div>
+        {(published.length > 1 || !mine.assignment) && published.length > 0 && (
+          <select className="input" style={{ width: 'auto', alignSelf: 'flex-start' }} value={scoreId ?? ''} onChange={(e) => { setVoice(e.target.value); stop(); }} aria-label="Voz">
+            {published.map((p) => <option key={p.id} value={p.id}>{p.label}{p.id === mine.score?.id ? ' (la tuya)' : ''}</option>)}
+          </select>
+        )}
+        <div className="live-score" ref={staffBox}>
+          <StaffView doc={doc} colorMode noteNames={names} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.82 : 1} />
+          <p className="xs faint" style={{ margin: '10px 4px 0' }}>
+            <span style={{ color: '#dc2626', fontWeight: 700 }}>Rojo</span>: en línea · <span style={{ color: '#2563eb', fontWeight: 700 }}>Azul</span>: en espacio · Verde: la que suena
+            {review.length ? ` · Revisa los compases ${review.slice(0, 6).join(', ')}` : ''}
+          </p>
+        </div>
+        <div className="live-dock">
+          <button className={`btn live-play-btn ${playing ? '' : 'primary'}`} onClick={play} data-testid="play-march">
+            {playing ? <><Square size={20} /> Parar</> : <><Play size={22} /> Reproducir</>}
+          </button>
+          <button className="btn live-chip-btn" onClick={nextSpeed} aria-label="Velocidad"><Gauge size={16} /> {speed} %</button>
+          <button className={`btn live-chip-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>
+          <button className={`btn live-chip-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro}>Metrónomo</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={embedded ? 'stack' : 'page stack'}>
       {!embedded && (
