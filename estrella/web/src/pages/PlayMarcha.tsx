@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Play, Square, FileText, ChevronLeft, Info, Wand2, Gauge, Pencil } from '../components/icons';
+import { Play, Square, FileText, ChevronLeft, Info, Wand2, Gauge, Pencil, Maximize, Minimize, RotateCw } from '../components/icons';
 import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useLoad, Spinner, ErrorBox, Notice, useToast } from '../components/ui';
@@ -10,6 +10,17 @@ import { playScores, unlockAudio, type ScorePlayback } from '../lib/audio';
 import { transcribePdf } from '../lib/pdf';
 import { useRealtime } from '../lib/realtime';
 import type { ScoreDoc } from '../../../shared/music';
+
+function useMedia(query: string) {
+  const [on, setOn] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    const m = window.matchMedia(query);
+    const h = () => setOn(m.matches);
+    h(); m.addEventListener('change', h);
+    return () => m.removeEventListener('change', h);
+  }, [query]);
+  return on;
+}
 
 /**
  * Página sencilla de una marcha: reproducir mi parte, ver las notas que me tocan y abrir el PDF.
@@ -37,6 +48,23 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const pb = useRef<ScorePlayback | null>(null);
   const staffBox = useRef<HTMLDivElement>(null);
   const narrow = typeof window !== 'undefined' && window.innerWidth < 600;
+  // móvil en horizontal: la marcha completa en una pantalla
+  const land = useMedia('(orientation: landscape) and (max-height: 540px)');
+  const phone = useMedia('(max-width: 699px) and (pointer: coarse)');
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
+  const [fitH, setFitH] = useState(0);
+  useEffect(() => {
+    if (!box) return;
+    const ro = new ResizeObserver(() => setFitH(box.clientHeight));
+    ro.observe(box); setFitH(box.clientHeight);
+    return () => ro.disconnect();
+  }, [box]);
+  const [full, setFull] = useState(() => typeof document !== 'undefined' && !!document.fullscreenElement);
+  useEffect(() => {
+    const on = () => setFull(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', on);
+    return () => document.removeEventListener('fullscreenchange', on);
+  }, []);
   // la partitura acompaña a la música: se desplaza al compás que suena
   useEffect(() => {
     if (measure == null) return;
@@ -83,10 +111,49 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
     } catch (e) { toast({ kind: 'error', text: (e as Error).message }); } finally { setBusy(false); }
   };
 
+  const speeds = [100, 90, 80, 70, 60];
+  const nextSpeed = () => { setSpeed(speeds[(speeds.indexOf(speed) + 1) % speeds.length] ?? 100); if (playing) stop(); };
+  // pantalla completa y, donde el móvil lo permite (Android), giro a horizontal; en iPhone basta con girarlo
+  const goFull = async () => {
+    if (document.fullscreenElement) { (screen.orientation as any)?.unlock?.(); await document.exitFullscreen?.().catch(() => {}); return; }
+    try { await document.documentElement.requestFullscreen?.(); await (screen.orientation as any)?.lock?.('landscape'); }
+    catch { if (!land) toast({ kind: 'info', text: 'Gira el móvil en horizontal para ver la marcha completa.' }); }
+  };
+  const turnHint = phone && !land && doc && (
+    <button className="btn sm turn-hint" onClick={goFull}><RotateCw size={15} /> Gira el móvil para ver la marcha completa</button>
+  );
+
+  // móvil en horizontal: toda la marcha en una pantalla, con los mandos en una tira arriba
+  if (land && doc) {
+    return (
+      <div className="full-march" data-testid="full-march">
+        <div className="full-bar">
+          <Link to="/" className="btn icon ghost" aria-label="Salir"><ChevronLeft size={20} /></Link>
+          <strong className="grow ellipsis">{x.title}</strong>
+          {(published.length > 1 || !mine.assignment) && published.length > 0 && (
+            <select className="input full-voice" value={scoreId ?? ''} onChange={(e) => { setVoice(e.target.value); stop(); }} aria-label="Voz">
+              {published.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+          )}
+          <button className={`btn full-btn ${playing ? '' : 'primary'}`} onClick={play} data-testid="play-march">
+            {playing ? <><Square size={16} /> Parar</> : <><Play size={16} /> Reproducir</>}
+          </button>
+          <button className="btn full-btn" onClick={nextSpeed} aria-label="Velocidad">{speed} %</button>
+          <button className={`btn full-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>
+          <button className={`btn full-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">Metr.</button>
+          {'requestFullscreen' in document.documentElement && (
+            <button className="btn icon ghost" onClick={goFull} aria-label="Pantalla completa">{full ? <Minimize size={18} /> : <Maximize size={18} />}</button>
+          )}
+        </div>
+        <div className="full-score" ref={setBox}>
+          {fitH > 0 && <StaffView doc={doc} colorMode noteNames={names} playingNoteId={noteId} currentMeasure={measure} fitHeight={fitH - 4} />}
+        </div>
+      </div>
+    );
+  }
+
   // ensayo en directo: la partitura ocupa la pantalla y los mandos van en una barra fija abajo (a mano del pulgar)
   if (embedded && doc) {
-    const speeds = [100, 90, 80, 70, 60];
-    const nextSpeed = () => { setSpeed(speeds[(speeds.indexOf(speed) + 1) % speeds.length] ?? 100); if (playing) stop(); };
     return (
       <div className="live-play">
         <div className="live-title">
@@ -98,6 +165,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
             {published.map((p) => <option key={p.id} value={p.id}>{p.label}{p.id === mine.score?.id ? ' (la tuya)' : ''}</option>)}
           </select>
         )}
+        {turnHint}
         <div className="live-score" ref={staffBox}>
           <StaffView doc={doc} colorMode noteNames={names} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.82 : 1} />
           <p className="xs faint" style={{ margin: '10px 4px 0' }}>
@@ -168,6 +236,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
         </div>
       ) : null}
 
+      {turnHint}
       {doc && (
         <div className="card">
           {score.data?.source === 'pdf' && (
