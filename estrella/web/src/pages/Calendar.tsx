@@ -5,6 +5,8 @@ import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useLoad, Modal, Field, useToast } from '../components/ui';
 import { useRealtime } from '../lib/realtime';
+import { Sheet, SheetOption } from '../components/Sheet';
+import { IcoEnsayo, IcoActuacion, IcoOtro } from '../components/SheetIcons';
 import { EVENT_TYPES, ATT_LABEL, fmtTime, toLocalInput, fromLocalInput } from '../lib/format';
 
 const DOW = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -28,6 +30,8 @@ export default function Calendar() {
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState<Date | null>(null);
   const [creating, setCreating] = useState(sp.get('nuevo') === '1');
+  const [choose, setChoose] = useState(false);
+  const [preset, setPreset] = useState<{ type: string; title: string } | undefined>();
   const now = new Date();
   // Un año hacia atrás y uno hacia delante: todo lo que la agenda puede enseñar
   const ev = useLoad(() => get<any[]>(`/events?from=${addDays(now, -366).toISOString()}&to=${addDays(now, 366).toISOString()}`), []);
@@ -59,7 +63,7 @@ export default function Calendar() {
         <div className="ag-seg" role="tablist">
           {(['anteriores', 'proximos'] as const).map((w) => <button key={w} role="tab" aria-selected={!day && when === w} className={!day && when === w ? 'on' : ''} onClick={() => { setWhen(w); setDay(null); }}>{w === 'proximos' ? 'Próximos' : 'Anteriores'}</button>)}
         </div>
-        {can('events.manage') && <button className="ag-add" onClick={() => setCreating(true)} aria-label="Nuevo evento" title="Nuevo evento"><Plus size={24} /></button>}
+        {can('events.manage') && <button className="ag-add" onClick={() => setChoose(true)} aria-label="Nuevo evento" title="Nuevo evento"><Plus size={24} /></button>}
       </div>
       <div className="ag-week">
         {open && (
@@ -106,7 +110,14 @@ export default function Calendar() {
           ))}
         </div>
       )}
-      {creating && <EventForm onClose={() => setCreating(false)} onSaved={() => { setCreating(false); ev.reload(); }} />}
+      {choose && (
+        <Sheet center title="Selecciona el tipo de evento" onClose={() => setChoose(false)}>
+          <SheetOption icon={<IcoEnsayo />} title="Ensayo" text="Sesiones de práctica y preparación" onClick={() => { setPreset({ type: 'ensayo', title: 'Ensayo' }); setChoose(false); setCreating(true); }} />
+          <SheetOption icon={<IcoActuacion />} title="Actuación" text="Procesiones, conciertos, actos y eventos en vivo" onClick={() => { setPreset({ type: 'actuacion', title: 'Actuación' }); setChoose(false); setCreating(true); }} />
+          <SheetOption icon={<IcoOtro />} title="Otro" text="Reuniones, viajes u otros eventos del grupo" onClick={() => { setPreset({ type: 'otro', title: '' }); setChoose(false); setCreating(true); }} />
+        </Sheet>
+      )}
+      {creating && <EventForm preset={preset} onClose={() => { setCreating(false); setPreset(undefined); }} onSaved={() => { setCreating(false); setPreset(undefined); ev.reload(); }} />}
     </div>
   );
 }
@@ -130,7 +141,7 @@ function AgendaItem({ e, past }: { e: any; past: boolean }) {
   );
 }
 
-export function EventForm({ initial, onClose, onSaved }: { initial?: any; onClose: () => void; onSaved: (id: string) => void }) {
+export function EventForm({ initial, preset, onClose, onSaved }: { initial?: any; preset?: { type: string; title: string }; onClose: () => void; onSaved: (id: string) => void }) {
   const toast = useToast();
   const nav = useNavigate();
   const struct = useLoad(() => get<any[]>('/org/structure'), []);
@@ -138,7 +149,7 @@ export function EventForm({ initial, onClose, onSaved }: { initial?: any; onClos
   const lib = useLoad(() => get<any[]>('/library/marchas'), []);
   const tomorrow = new Date(Date.now() + 86400000); tomorrow.setHours(20, 30, 0, 0);
   const [f, setF] = useState<any>(() => initial ? { ...initial, starts_at: toLocalInput(initial.starts_at), call_at: toLocalInput(initial.call_at), ends_at: toLocalInput(initial.ends_at), repertoire: initial.repertoire?.map((m: any) => m.id) ?? [] }
-    : { type: 'ensayo', title: 'Ensayo', starts_at: toLocalInput(tomorrow), call_at: toLocalInput(new Date(tomorrow.getTime() - 15 * 60000)), ends_at: toLocalInput(new Date(tomorrow.getTime() + 2 * 3600000)), location: '', uniform: '', notes: '', responsible_id: '', section_ids: [], repertoire: [] });
+    : { type: preset?.type ?? 'ensayo', title: preset?.title ?? 'Ensayo', starts_at: toLocalInput(tomorrow), call_at: toLocalInput(new Date(tomorrow.getTime() - 15 * 60000)), ends_at: toLocalInput(new Date(tomorrow.getTime() + 2 * 3600000)), location: '', uniform: '', notes: '', responsible_id: '', section_ids: [], repertoire: [] });
   const set = (k: string) => (e: any) => setF({ ...f, [k]: e.target.value });
   const save = async () => {
     const body = { type: f.type, title: f.title, starts_at: fromLocalInput(f.starts_at), call_at: fromLocalInput(f.call_at), ends_at: fromLocalInput(f.ends_at), location: f.location || null, uniform: f.uniform || null, notes: f.notes || null, responsible_id: f.responsible_id || null, section_ids: f.section_ids, repertoire: f.repertoire, ...(initial ? { status: f.status } : {}) };
@@ -148,7 +159,7 @@ export function EventForm({ initial, onClose, onSaved }: { initial?: any; onClos
     } catch (e) { toast({ kind: 'error', text: (e as Error).message }); }
   };
   return (
-    <Modal title={initial ? 'Editar evento' : 'Nuevo evento'} wide onClose={onClose} footer={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={save} disabled={!f.title || !f.starts_at} data-testid="event-save">Guardar</button></>}>
+    <Modal title={initial ? 'Editar evento' : preset ? `Nuevo: ${EVENT_TYPES[preset.type] ?? 'evento'}` : 'Nuevo evento'} wide onClose={onClose} footer={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={save} disabled={!f.title || !f.starts_at} data-testid="event-save">Guardar</button></>}>
       <div className="stack">
         <div className="form-grid">
           <Field label="Tipo"><select className="input" value={f.type} onChange={set('type')}>{Object.entries(EVENT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>

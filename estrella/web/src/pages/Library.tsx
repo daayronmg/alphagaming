@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Plus, Star, Music, FileText, Headphones, FileMusic, Folder, Upload, Wand2 } from '../components/icons';
 import GenerateNotes from '../components/GenerateNotes';
+import { Sheet, SheetOption } from '../components/Sheet';
+import { IcoPdf, IcoCarpeta, IcoAudio, IcoSeguir } from '../components/SheetIcons';
 import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useLoad, Empty, Modal, Field, useToast, Spinner, ErrorBox } from '../components/ui';
@@ -17,6 +19,7 @@ export default function Library() {
   const struct = useLoad(() => get<any[]>('/org/structure'), []);
   const events = useLoad(() => get<any[]>('/events'), []);
   const [creating, setCreating] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [notes, setNotes] = useState(false);
   const instruments = (struct.data ?? []).flatMap((s) => s.instruments);
 
@@ -24,7 +27,7 @@ export default function Library() {
     <div className="page">
       <div className="page-head">
         <div><div className="eyebrow">Repertorio</div><h1>Biblioteca musical</h1></div>
-        {can('library.manage') && <div className="row">{can('scores.publish') && <button className="btn" onClick={() => setNotes(true)}><Wand2 size={18} /> Sacar notas de los PDF</button>}<Link className="btn" to="/biblioteca/importar"><Upload size={18} /> Subir marchas</Link><button className="btn primary" onClick={() => setCreating(true)}><Plus size={18} /> Nueva marcha</button></div>}
+        {can('library.manage') && <div className="row">{can('scores.publish') && <button className="btn" onClick={() => setNotes(true)}><Wand2 size={18} /> Sacar notas de los PDF</button>}<Link className="btn" to="/biblioteca/importar"><Upload size={18} /> Libreto</Link><button className="btn primary" onClick={() => setAdding(true)}><Plus size={18} /> Añadir marcha</button></div>}
       </div>
       <div className="card flat stack" style={{ marginBottom: 18 }}>
         <div className="row nowrap"><Search size={18} className="faint" /><input className="input" placeholder="Buscar por título o compositor…" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} aria-label="Buscar" /></div>
@@ -64,6 +67,14 @@ export default function Library() {
           </Link>
         ))}
       </div>
+      {adding && (
+        <Sheet title="¿Cómo quieres añadir la marcha?" onClose={() => setAdding(false)}>
+          <SheetOption icon={<IcoPdf />} title="Un PDF con todas las secciones" badge="✨ Con sonido" text="Todas las voces en un solo PDF: la app las separa." onClick={() => nav('/biblioteca/nueva?modo=pdf')} />
+          <SheetOption icon={<IcoCarpeta />} title="Una carpeta con todas las secciones" badge="✨ Con sonido" text="Las voces separadas en varios PDF." onClick={() => nav('/biblioteca/nueva?modo=carpeta')} />
+          <SheetOption icon={<IcoAudio />} title="Subir audio o vídeo" text="Grabaciones o vídeos de la marcha." onClick={() => nav('/biblioteca/nueva?modo=audio')} />
+          <SheetOption icon={<IcoSeguir />} title="Continuar sin subir archivos" text="Añade los archivos más tarde." onClick={() => nav('/biblioteca/nueva?modo=vacia')} />
+        </Sheet>
+      )}
       {notes && <GenerateNotes onClose={() => { setNotes(false); list.reload(); }} />}
       {creating && <MarchaForm folders={meta.data?.folders ?? []} onClose={() => setCreating(false)} onSaved={(id) => { setCreating(false); toast({ kind: 'ok', text: 'Marcha creada' }); nav(`/marchas/${id}`); }} />}
     </div>
