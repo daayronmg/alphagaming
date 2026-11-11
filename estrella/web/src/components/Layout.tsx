@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   Home, CalendarDays, Library, Radio, Megaphone, MessageCircleQuestion, GraduationCap, Bot, Users, BarChart3,
-  Settings, Shield, Package, LogOut, Moon, Sun, Wifi, WifiOff, RefreshCw, Siren, CloudUpload, Menu, Baton,
+  Settings, Shield, Package, LogOut, Moon, Sun, Wifi, WifiOff, RefreshCw, Siren, CloudUpload, Baton,
 } from './icons';
 import { useAuth } from '../lib/auth';
 import { rt, useConn, useRealtime } from '../lib/realtime';
@@ -101,7 +101,7 @@ export default function Layout() {
 
   const links: { to: string; label: string; icon: ReactNode; show?: boolean; count?: number; group?: string }[] = [
     { to: '/', label: 'Inicio', icon: <Home size={19} /> },
-    { to: '/calendario', label: 'Calendario', icon: <CalendarDays size={19} /> },
+    { to: '/calendario', label: 'Agenda', icon: <CalendarDays size={19} /> },
     { to: '/biblioteca', label: 'Marchas', icon: <Library size={19} /> },
     { to: director ? '/dirigir' : '/en-directo', label: director ? 'Dirigir ensayo' : 'Ensayo en directo', icon: <Radio size={19} />, count: live ? 1 : 0 },
     { to: '/avisos', label: 'Avisos', icon: <Megaphone size={19} />, count: unread },
@@ -172,10 +172,14 @@ export default function Layout() {
         <Outlet />
       </div>
       <nav className="bottom-nav">
-        {[visible[0], visible[2], visible[3], visible[1]].map((l) => (
-          <NavLink key={l.to} to={l.to} end={l.to === '/'} className={({ isActive }) => (isActive ? 'active' : '')}>{l.icon}<span>{l.label.split(' ')[0]}</span>{!!l.count && l.label.startsWith('Ensayo') && <span className="dot" />}</NavLink>
+        {[visible[1], visible[2]].map((l) => (
+          <NavLink key={l.to} to={l.to} className={({ isActive }) => (isActive ? 'active' : '')}>{l.icon}<span>{l.label}</span></NavLink>
         ))}
-        <button onClick={() => setMore(true)}><Menu size={19} /><span>Más</span>{(unread > 0 || doubtCount > 0) && <span className="dot" />}</button>
+        <NavLink to="/" end className={({ isActive }) => `nav-home ${isActive ? 'active' : ''}`} aria-label="Inicio"><img src={logoUrl(branding)} alt="" /><span>Inicio</span></NavLink>
+        <NavLink to={visible[3].to} className={({ isActive }) => (isActive ? 'active' : '')}>{visible[3].icon}<span>{director ? 'Dirigir' : 'Ensayo'}</span>{!!visible[3].count && <span className="dot" />}</NavLink>
+        <button onClick={() => setMore(true)} aria-label="Perfil y más opciones">
+          <span className="nav-avatar">{me.photo_file_id ? <img src={fileUrl(me.photo_file_id)} alt="" /> : initials(me.name)}</span><span>Perfil</span>{(unread > 0 || doubtCount > 0) && <span className="dot" />}
+        </button>
       </nav>
       {more && (
         <Modal title={appName} onClose={() => setMore(false)}>

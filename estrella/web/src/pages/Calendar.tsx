@@ -1,75 +1,132 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Plus, List, CalendarDays } from '../components/icons';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus } from '../components/icons';
 import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { useLoad, Modal, Field, useToast, Tabs, Empty } from '../components/ui';
+import { useLoad, Modal, Field, useToast } from '../components/ui';
 import { useRealtime } from '../lib/realtime';
-import { EVENT_TYPES, fmtDate, fmtTime, toLocalInput, fromLocalInput } from '../lib/format';
+import { EVENT_TYPES, ATT_LABEL, fmtTime, toLocalInput, fromLocalInput } from '../lib/format';
 
 const DOW = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const FILTERS = [
+  { v: 'todos', l: 'Todos' }, { v: 'actuaciones', l: 'Actuaciones' }, { v: 'ensayos', l: 'Ensayos' }, { v: 'otros', l: 'Otros' },
+] as const;
+type Filter = typeof FILTERS[number]['v'];
+const ofFilter = (t: string, f: Filter) => f === 'todos' || (f === 'ensayos' ? t === 'ensayo' : f === 'otros' ? t === 'otro' : ['actuacion', 'concierto', 'procesion'].includes(t));
+const mondayOf = (d: Date) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+const monthLabel = (d: Date) => { const m = d.toLocaleDateString('es-ES', { month: 'long' }); return `${m[0].toUpperCase()}${m.slice(1)} ${d.getFullYear()}`; };
+const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 
+/** Agenda: semana arriba (se despliega al mes), anteriores / próximos y filtros por tipo. */
 export default function Calendar() {
   const { can } = useAuth();
   const [sp, setSp] = useSearchParams();
-  const [month, setMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
-  const [view, setView] = useState<'mes' | 'lista'>(() => (window.innerWidth < 700 ? 'lista' : 'mes'));
+  const [when, setWhen] = useState<'proximos' | 'anteriores'>('proximos');
+  const [filter, setFilter] = useState<Filter>('todos');
+  const [week, setWeek] = useState(() => mondayOf(new Date()));
+  const [open, setOpen] = useState(false);
+  const [day, setDay] = useState<Date | null>(null);
   const [creating, setCreating] = useState(sp.get('nuevo') === '1');
-  const from = new Date(month.getFullYear(), month.getMonth(), 1 - 7);
-  const to = new Date(month.getFullYear(), month.getMonth() + 1, 7);
-  const ev = useLoad(() => get<any[]>(`/events?from=${from.toISOString()}&to=${to.toISOString()}`), [month.getTime()]);
+  const now = new Date();
+  // Un año hacia atrás y uno hacia delante: todo lo que la agenda puede enseñar
+  const ev = useLoad(() => get<any[]>(`/events?from=${addDays(now, -366).toISOString()}&to=${addDays(now, 366).toISOString()}`), []);
   useRealtime((m) => { if (m.t === 'events:changed') ev.reload(); }, []);
   useEffect(() => { if (!creating && sp.get('nuevo')) setSp({}); }, [creating]); // eslint-disable-line
 
-  const start = new Date(month); const off = (start.getDay() + 6) % 7; start.setDate(start.getDate() - off);
-  const days = Array.from({ length: 42 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; });
-  const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-  const list = (ev.data ?? []).filter((e) => new Date(e.starts_at).getMonth() === month.getMonth());
+  const all = (ev.data ?? []).filter((e) => ofFilter(e.type, filter));
+  const hasEv = (d: Date) => all.some((e) => same(new Date(e.starts_at), d));
+  const list = day
+    ? all.filter((e) => same(new Date(e.starts_at), day))
+    : when === 'proximos'
+      ? all.filter((e) => new Date(e.starts_at) >= new Date(now.toDateString()))
+      : all.filter((e) => new Date(e.starts_at) < new Date(now.toDateString())).reverse();
+  const month = new Date(week.getFullYear(), week.getMonth() + (week.getDate() > 24 ? 1 : 0), 1);
+  const grid = Array.from({ length: 42 }, (_, i) => addDays(mondayOf(month), i));
+  const pick = (d: Date) => { setDay(day && same(day, d) ? null : d); setWeek(mondayOf(d)); };
+  const dayCell = (d: Date, other = false) => (
+    <button key={d.toISOString()} type="button" className={`ag-day ${same(d, now) ? 'today' : ''} ${day && same(d, day) ? 'sel' : ''} ${other ? 'other' : ''}`} onClick={() => pick(d)} aria-label={d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}>
+      <span>{d.getDate()}</span>{hasEv(d) && <i />}
+    </button>
+  );
+  const groups: { key: string; date: Date; items: any[] }[] = [];
+  for (const e of list) { const d = new Date(e.starts_at); const k = d.toDateString(); const g = groups.find((x) => x.key === k); if (g) g.items.push(e); else groups.push({ key: k, date: d, items: [e] }); }
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <div><div className="eyebrow">Agenda de la banda</div><h1>Calendario</h1></div>
-        <div className="row">
-          <Tabs value={view} onChange={setView} items={[{ value: 'mes', label: <CalendarDays size={16} /> }, { value: 'lista', label: <List size={16} /> }]} />
-          {can('events.manage') && <button className="btn primary" onClick={() => setCreating(true)}><Plus size={18} /> Nuevo evento</button>}
+    <div className="page agenda">
+      <div className="ag-head">
+        <h1>Agenda</h1>
+        <div className="ag-seg" role="tablist">
+          {(['anteriores', 'proximos'] as const).map((w) => <button key={w} role="tab" aria-selected={!day && when === w} className={!day && when === w ? 'on' : ''} onClick={() => { setWhen(w); setDay(null); }}>{w === 'proximos' ? 'Próximos' : 'Anteriores'}</button>)}
+        </div>
+        {can('events.manage') && <button className="ag-add" onClick={() => setCreating(true)} aria-label="Nuevo evento" title="Nuevo evento"><Plus size={24} /></button>}
+      </div>
+      <div className="ag-week">
+        {open && (
+            <div className="ag-month-nav">
+              <button className="btn icon ghost sm" onClick={() => setWeek(mondayOf(new Date(month.getFullYear(), month.getMonth() - 1, 1)))} aria-label="Mes anterior"><ChevronLeft size={18} /></button>
+              <b>{monthLabel(month)}</b>
+              <button className="btn icon ghost sm" onClick={() => setWeek(mondayOf(new Date(month.getFullYear(), month.getMonth() + 1, 1)))} aria-label="Mes siguiente"><ChevronRight size={18} /></button>
+            </div>
+        )}
+        <div className="ag-dow">{DOW.map((d) => <span key={d}>{d}</span>)}</div>
+        {open ? (
+          <>
+            <div className="ag-days">{grid.map((d) => dayCell(d, d.getMonth() !== month.getMonth()))}</div>
+          </>
+        ) : (
+          <div className="ag-days row1">
+            <button className="ag-arrow" onClick={() => setWeek(addDays(week, -7))} aria-label="Semana anterior"><ChevronLeft size={16} /></button>
+            {Array.from({ length: 7 }, (_, i) => dayCell(addDays(week, i)))}
+            <button className="ag-arrow r" onClick={() => setWeek(addDays(week, 7))} aria-label="Semana siguiente"><ChevronRight size={16} /></button>
+          </div>
+        )}
+        <div className="ag-foot">
+          <span>{open ? '' : monthLabel(week)}</span>
+          <button className="ag-toggle" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? 'Ver solo la semana' : 'Ver el mes entero'}>{open ? <ChevronUp size={22} /> : <ChevronDown size={22} />}</button>
         </div>
       </div>
-      <div className="row between" style={{ marginBottom: 14 }}>
-        <button className="btn icon" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} aria-label="Mes anterior"><ChevronLeft size={18} /></button>
-        <h2 style={{ textTransform: 'capitalize' }}>{month.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h2>
-        <button className="btn icon" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} aria-label="Mes siguiente"><ChevronRight size={18} /></button>
+      <div className="ag-chips">
+        {FILTERS.map((f) => <button key={f.v} className={filter === f.v ? 'on' : ''} onClick={() => setFilter(f.v)}>{f.l}</button>)}
+        {day && <button className="on" onClick={() => setDay(null)}>{day.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} ✕</button>}
       </div>
-      {view === 'mes' ? (
-        <div className="cal">
-          {DOW.map((d) => <div key={d} className="dow">{d}</div>)}
-          {days.map((d) => (
-            <div key={d.toISOString()} className={`day ${d.getMonth() !== month.getMonth() ? 'other' : ''} ${same(d, new Date()) ? 'today' : ''}`}>
-              <span className="faint">{d.getDate()}</span>
-              {(ev.data ?? []).filter((e) => same(new Date(e.starts_at), d)).map((e) => (
-                <Link key={e.id} to={`/eventos/${e.id}`} className={`ev ${e.type}`} title={e.title} style={e.status === 'cancelado' ? { textDecoration: 'line-through', opacity: .6 } : undefined}>{fmtTime(e.starts_at)} {e.title}</Link>
-              ))}
-            </div>
-          ))}
+      {ev.loading && !ev.data ? <p className="muted center">Cargando…</p> : !groups.length ? (
+        <div className="ag-empty">
+          <div className="ag-empty-ico" aria-hidden>📅</div>
+          <h3>{day ? 'Nada este día' : when === 'proximos' ? 'No tienes eventos previstos' : 'No hay eventos anteriores'}</h3>
+          <p className="muted">{day ? 'No hay actos ni ensayos ese día.' : when === 'proximos' ? 'Todavía no tienes actos o ensayos programados.' : 'Aquí verás los ensayos y actos que ya han pasado.'}</p>
         </div>
       ) : (
-        <div className="stack sm">
-          {!list.length && <Empty title="Sin eventos este mes" />}
-          {list.map((e) => (
-            <Link key={e.id} to={`/eventos/${e.id}`} className="card flat tight row">
-              <div style={{ textAlign: 'center', minWidth: 56 }}><div className="xs faint">{fmtDate(e.starts_at).split(' ')[0]}</div><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 700 }}>{new Date(e.starts_at).getDate()}</div></div>
-              <div className="grow">
-                <div style={{ fontWeight: 650 }}>{e.title} {e.status === 'cancelado' && <span className="badge danger">Cancelado</span>}</div>
-                <div className="xs muted">{EVENT_TYPES[e.type]} · {fmtTime(e.starts_at)}{e.location ? ` · ${e.location}` : ''}</div>
-              </div>
-              {e.my_rsvp && <span className={`badge ${e.my_rsvp === 'asistire' ? 'ok' : 'danger'}`}>{e.my_rsvp === 'asistire' ? 'Asistiré' : 'No asistiré'}</span>}
-              {e.live && <span className="badge accent">En directo</span>}
-            </Link>
+        <div className="ag-list">
+          {groups.map((g) => (
+            <section key={g.key}>
+              <h4 className="ag-date">{same(g.date, now) ? 'Hoy' : same(g.date, addDays(now, 1)) ? 'Mañana' : g.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</h4>
+              {g.items.map((e) => <AgendaItem key={e.id} e={e} past={new Date(e.starts_at) < now} />)}
+            </section>
           ))}
         </div>
       )}
       {creating && <EventForm onClose={() => setCreating(false)} onSaved={() => { setCreating(false); ev.reload(); }} />}
     </div>
+  );
+}
+
+function AgendaItem({ e, past }: { e: any; past: boolean }) {
+  const kind = e.type === 'ensayo' ? 'ensayo' : e.type === 'otro' ? 'otro' : 'actuacion';
+  const status = e.status === 'cancelado' ? <span className="badge danger">Cancelado</span>
+    : e.live ? <span className="badge accent">En directo</span>
+    : past ? (e.my_attendance ? <span className={`badge ${e.my_attendance === 'presente' ? 'ok' : e.my_attendance === 'ausente' ? 'danger' : ''}`}>{ATT_LABEL[e.my_attendance] ?? e.my_attendance}</span> : null)
+    : e.my_rsvp ? <span className={`badge ${e.my_rsvp === 'asistire' ? 'ok' : 'danger'}`}>{e.my_rsvp === 'asistire' ? 'Voy' : 'No voy'}</span>
+    : e.convoked ? <span className="badge warn">Confirma</span> : null;
+  return (
+    <Link to={`/eventos/${e.id}`} className={`ag-item ${kind} ${e.status === 'cancelado' ? 'off' : ''}`}>
+      <div className="ag-time"><b>{fmtTime(e.call_at ?? e.starts_at)}</b>{e.call_at && <small>citación</small>}</div>
+      <div className="grow" style={{ minWidth: 0 }}>
+        <div className="ag-title">{e.title}</div>
+        <div className="xs muted ellipsis">{EVENT_TYPES[e.type]}{e.location ? ` · ${e.location}` : ''}</div>
+      </div>
+      {status}
+    </Link>
   );
 }
 
