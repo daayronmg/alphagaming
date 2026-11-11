@@ -567,3 +567,8 @@ button.march-row { width: 100%; background: none; border: 0; border-bottom: 1px 
 /* móvil en horizontal: páginas enteras, una al lado de otra */
 .pages-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 8px; }
 .pages-row .score-page { margin: 0 !important; flex: none; }
+/* cambio de modo dirección / músico */
+.mode-switch { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); margin-bottom: 6px; }
+.mode-switch button { border: 0; background: transparent; padding: 12px; border-radius: 10px; font: inherit; font-weight: 700; color: var(--text-3); cursor: pointer; }
+.mode-switch button.on { background: var(--surface); color: var(--ok); box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
+.mode-pill { border: 0; border-radius: 999px; padding: 6px 12px; background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); font: inherit; font-weight: 700; font-size: .78rem; cursor: pointer; }

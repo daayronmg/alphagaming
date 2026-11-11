@@ -475,3 +475,20 @@ async function cookieOf(email: string) {
   const r = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ email, password: DEMO_PASSWORD }) });
   return r.headers.get('set-cookie')!.split(';')[0];
 }
+
+test('modo músico: solo quien tiene el permiso cambia de modo y, en modo músico, no tiene poderes de dirección', async () => {
+  const emilio = await login('emilio@estrella.demo');
+  assert.equal((await emilio('/auth/mode', 'POST', { member: true })).status, 403);
+  await pool.query(`update users set permissions = array_append(permissions, 'mode.switch') where email = 'emilio@estrella.demo'`);
+  const e2 = await login('emilio@estrella.demo');
+  assert.equal((await e2('/members/invitations/open', 'POST', { hours: 1 })).status, 200);
+  assert.equal((await e2('/auth/mode', 'POST', { member: true })).status, 200);
+  const me = (await e2('/auth/me')).data.user;
+  assert.equal(me.role, 'member'); assert.equal(me.actingMember, true); assert.equal(me.canSwitchMode, true);
+  assert.equal((await e2('/members/invitations/open', 'POST', { hours: 1 })).status, 403);
+  // otro dispositivo de la misma persona sigue en modo dirección
+  assert.equal((await emilio('/auth/me')).data.user.role, 'director');
+  assert.equal((await e2('/auth/mode', 'POST', { member: false })).status, 200);
+  assert.equal((await e2('/auth/me')).data.user.role, 'director');
+  await pool.query(`update users set permissions = array_remove(permissions, 'mode.switch') where email = 'emilio@estrella.demo'`);
+});
