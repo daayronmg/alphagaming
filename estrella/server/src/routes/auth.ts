@@ -60,11 +60,59 @@ authRouter.get('/me', h(async (req, res) => {
 
 // Registro controlado: solo con un código de invitación emitido por la dirección
 authRouter.get('/invitation/:code', h(async (req, res) => {
-  const inv = await one<any>(`select i.code, i.email, i.name, i.role, ins.name as instrument, v.name as voice
+  const inv = await one<any>(`select i.code, i.email, i.name, i.role, i.open, i.expires_at, ins.name as instrument, v.name as voice
     from invitations i left join instruments ins on ins.id = i.instrument_id left join voices v on v.id = i.voice_id
     where i.code = $1 and i.used_at is null and i.expires_at > now()`, [req.params.code]);
   if (!inv) throw new HttpError(404, 'Invitación no válida o caducada.');
+  if (inv.open) {
+    // Para el alta por enlace: instrumentos y voces que puede elegir (la dirección nunca se elige)
+    inv.instruments = await q<any>(`select i.id, i.name, s.name as section, s.family,
+        coalesce((select json_agg(json_build_object('id', v.id, 'name', v.name) order by v.sort, v.id) from voices v where v.instrument_id = i.id), '[]') as voices
+      from instruments i join sections s on s.id = i.section_id order by s.sort, s.id, i.sort, i.id`);
+  }
   res.json(inv);
+}));
+
+// Alta con un enlace abierto: nombre, teléfono, contraseña, instrumento y voz. Siempre como componente.
+authRouter.post('/join', h(async (req, res) => {
+  const b = parse(z.object({
+    code: z.string().min(6).max(80),
+    name: z.string().trim().min(2, 'Escribe tu nombre y apellidos.').max(120),
+    phone: z.string().trim().max(30),
+    email: z.union([z.literal(''), z.string().trim().email('El correo no es válido.').max(200)]).optional(),
+    password: z.string().max(200),
+    instrument_id: z.number().int(),
+    voice_id: z.number().int().nullable().optional(),
+  }), req.body);
+  if (loginRateLimited(`join|${req.ip}`)) throw new HttpError(429, 'Demasiados intentos. Espera unos minutos.');
+  const k = phoneKey(b.phone);
+  if (!k) throw new HttpError(400, 'Escribe un número de teléfono válido.');
+  const pwErr = validatePassword(b.password);
+  if (pwErr) throw new HttpError(400, pwErr);
+  const userId = await tx(async (c) => {
+    const inv = await one<any>('select code from invitations where code = $1 and open and expires_at > now() for update', [b.code], c);
+    if (!inv) throw new HttpError(404, 'Este enlace no es válido o ya ha caducado. Pide uno nuevo a la dirección.');
+    if (!(await one('select 1 from instruments where id = $1', [b.instrument_id], c))) throw new HttpError(400, 'Elige tu instrumento.');
+    const hasVoices = await one('select 1 from voices where instrument_id = $1 limit 1', [b.instrument_id], c);
+    if (b.voice_id) {
+      if (!(await one('select 1 from voices where id = $1 and instrument_id = $2', [b.voice_id, b.instrument_id], c))) throw new HttpError(400, 'La voz elegida no es de ese instrumento.');
+    } else if (hasVoices) throw new HttpError(400, 'Elige tu voz.');
+    if (await one(`select 1 from users where right(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), 9) = $1`, [k], c)) {
+      throw new HttpError(409, 'Ya hay una cuenta con ese teléfono. Entra con él; si no recuerdas la contraseña, pídesela a la dirección.');
+    }
+    const email = b.email ? b.email.toLowerCase() : `tel34${k}@sin-correo.bandaestrella.es`;
+    if (await one('select 1 from users where lower(email) = $1', [email], c)) throw new HttpError(409, 'Ya hay una cuenta con ese correo.');
+    const u = await one<any>(`insert into users(email, password_hash, name, role, joined_at, phone) values ($1,$2,$3,'member',current_date,$4) returning id`,
+      [email, hashPassword(b.password), b.name, b.phone], c);
+    const asg = [{ instrument_id: b.instrument_id, voice_id: b.voice_id ?? null, is_default: true }];
+    await q('insert into user_assignments(user_id, instrument_id, voice_id, is_default) values ($1,$2,$3,true)', [u.id, b.instrument_id, b.voice_id ?? null], c);
+    await q(`insert into assignment_changes(user_id, before, after, status, reason, requested_by, applied_by, applied_at) values ($1,'[]',$2,'aplicado','Alta con enlace de invitación',$1,$1,now())`, [u.id, JSON.stringify(asg)], c);
+    await q('update invitations set uses = uses + 1 where code = $1', [b.code], c);
+    await audit(u.id, 'register', 'user', u.id, { invitation: b.code, open: true }, c);
+    return u.id as string;
+  });
+  await createSession(res, userId, req.get('user-agent'));
+  res.json({ ok: true });
 }));
 
 authRouter.post('/register', h(async (req, res) => {
@@ -72,7 +120,7 @@ authRouter.post('/register', h(async (req, res) => {
   const pwErr = validatePassword(b.password);
   if (pwErr) throw new HttpError(400, pwErr);
   const userId = await tx(async (c) => {
-    const inv = await one<any>('select * from invitations where code = $1 and used_at is null and expires_at > now() for update', [b.code], c);
+    const inv = await one<any>('select * from invitations where code = $1 and not open and used_at is null and expires_at > now() for update', [b.code], c);
     if (!inv) throw new HttpError(404, 'Invitación no válida o caducada.');
     if (inv.email && inv.email.toLowerCase() !== b.email.toLowerCase()) throw new HttpError(400, 'Esta invitación está asociada a otro correo electrónico.');
     // Si la dirección ya creó la ficha con ese correo, la invitación activa esa ficha (no crea otra)

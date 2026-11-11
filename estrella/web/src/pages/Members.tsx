@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth';
 import { useLoad, Modal, Field, useToast, Notice, Spinner } from '../components/ui';
 import { initials, assignmentLabel } from '../lib/format';
 import { fileUrl } from '../lib/api';
+import { InviteLink } from '../components/InviteLink';
 
 export default function Members() {
   const { can } = useAuth();
@@ -34,6 +35,7 @@ export default function Members() {
           <button className="btn primary" onClick={() => setCreating(true)}><UserPlus size={16} /> Nuevo componente</button>
         </div>}
       </div>
+      {manage && <div style={{ marginBottom: 16 }}><InviteLink /></div>}
       <div className="card flat row" style={{ marginBottom: 16 }}>
         <Search size={18} className="faint" /><input className="input" style={{ maxWidth: 260 }} placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="input" style={{ width: 'auto' }} value={sec} onChange={(e) => setSec(e.target.value)}><option value="">Todas las secciones</option>{(struct.data ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>

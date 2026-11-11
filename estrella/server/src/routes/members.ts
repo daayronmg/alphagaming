@@ -239,7 +239,16 @@ membersRouter.post('/:id/reset-link', requirePerm('members.manage'), h(async (re
 
 // Invitaciones genéricas
 membersRouter.get('/invitations/list', requirePerm('members.manage'), h(async (_req, res) => {
-  res.json(await q(`select i.code, i.email, i.role, i.created_at, i.expires_at, i.used_at, u.name as used_by_name from invitations i left join users u on u.id = i.used_by order by i.created_at desc limit 100`));
+  const rows = await q<any>(`select i.code, i.email, i.role, i.open, i.uses, i.created_at, i.expires_at, i.used_at, u.name as used_by_name from invitations i left join users u on u.id = i.used_by order by i.created_at desc limit 100`);
+  res.json(rows.map((r) => ({ ...r, link: r.open ? `${config.publicUrl}/unirse/${r.code}` : `${config.publicUrl}/registro?codigo=${r.code}` })));
+}));
+/** Enlace abierto para compartir: vale para varias personas hasta que caduca. Siempre da de alta como componente. */
+membersRouter.post('/invitations/open', requirePerm('members.manage'), h(async (req, res) => {
+  const b = parse(z.object({ hours: z.number().int().min(1).max(24 * 90) }), req.body);
+  const code = randomToken(9);
+  const r = await one<any>(`insert into invitations(code, role, open, created_by, expires_at) values ($1, 'member', true, $2, now() + make_interval(hours => $3)) returning expires_at`, [code, req.user!.id, b.hours]);
+  await audit(req.user!.id, 'create', 'invitation', code, { open: true, hours: b.hours });
+  res.json({ code, link: `${config.publicUrl}/unirse/${code}`, expires_at: r.expires_at });
 }));
 membersRouter.delete('/invitations/:code', requirePerm('members.manage'), h(async (req, res) => {
   await q('delete from invitations where code = $1 and used_at is null', [req.params.code]);
