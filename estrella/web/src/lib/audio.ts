@@ -171,7 +171,8 @@ function cornetaReal(c: AudioContext, dest: AudioNode, freq: number, t: number, 
   let best = cornetNotes[0];
   for (const n of cornetNotes) if (Math.abs(Math.log(freq / n.f0)) < Math.abs(Math.log(freq / best.f0))) best = n;
   const rate = freq / best.f0;
-  const XF = 0.06; // cruce entre notas ligadas
+  // medido sobre un cornetista tocando el solo de Bulerías: el paso entre notas dura unos 10–60 ms y el volumen no baja
+  const XF = 0.02; // cruce entre notas ligadas
   const legIn = !!ph.fromFreq && !ph.retongue;
   const peak = 0.6 * vel;
   // duración real de la nota: ligada → hasta que acaba de entrar la siguiente; repetida → hasta el golpe de lengua
@@ -187,17 +188,17 @@ function cornetaReal(c: AudioContext, dest: AudioNode, freq: number, t: number, 
     // la altura resbala de la nota anterior a esta; con giro de llave, más despacio
     // (el deslizamiento empieza a medio camino: si las dos notas coinciden en altura al cruzarse, se anulan)
     pr.setValueAtTime(rate * Math.pow(ph.fromFreq! / freq, 0.55), t);
-    pr.exponentialRampToValueAtTime(rate, t + (ph.keyTurn ? 0.055 : 0.025));
+    pr.exponentialRampToValueAtTime(rate, t + (ph.keyTurn ? 0.04 : 0.012));
   } else {
     pr.setValueAtTime(rate * 0.99, t);
     pr.exponentialRampToValueAtTime(rate, t + 0.04);
   }
   // vibrato discreto en las notas largas, que aparece poco a poco
   if (len > 0.5) {
-    const lfo = c.createOscillator(); lfo.frequency.value = 5.2;
+    const lfo = c.createOscillator(); lfo.frequency.value = 6.5; // vibrato rápido y fino, como el medido
     const depth = c.createGain();
     depth.gain.setValueAtTime(0, t); depth.gain.setValueAtTime(0, t + 0.3);
-    depth.gain.linearRampToValueAtTime(rate * 0.0042, Math.min(end, t + 0.85));
+    depth.gain.linearRampToValueAtTime(rate * 0.0058, Math.min(end, t + 0.85));
     lfo.connect(depth); depth.connect(pr); lfo.start(t); lfo.stop(end + 0.05);
   }
   // envolvente: entrada, cuerpo y salida, sin solapar automatizaciones
