@@ -11,15 +11,18 @@ interface Result { title: string; label: string; ok: boolean; text: string }
  * Lee las notas de todas las partes en PDF que aún no las tienen y las publica para que se puedan escuchar.
  * Se hace en el navegador de la dirección, una parte detrás de otra.
  */
-export default function GenerateNotes({ onClose, auto }: { onClose: () => void; auto?: boolean }) {
+export default function GenerateNotes({ onClose, auto, marchaId }: { onClose: () => void; auto?: boolean; marchaId?: string }) {
   const [pending, setPending] = useState<Row[] | null>(null);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState<Result[]>([]);
   const [current, setCurrent] = useState('');
   const stopRef = useRef(false);
-  useEffect(() => { get<Row[]>('/scores/pdf/pending').then((r) => { setPending(r); if (auto && r.length) run(r); }).catch(() => setPending([])); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const startedRef = useRef(false);
+  useEffect(() => { get<Row[]>('/scores/pdf/pending').then((all) => { const r = marchaId ? all.filter((x) => x.marcha_id === marchaId) : all; setPending(r); if (auto && r.length) run(r); }).catch(() => setPending([])); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = async (rows: Row[]) => {
+    if (startedRef.current) return; // una sola vez aunque React monte dos veces
+    startedRef.current = true;
     setRunning(true); stopRef.current = false;
     // las marchas de un libreto comparten el mismo PDF: se descarga una sola vez
     const files = new Map<string, ArrayBuffer>();
@@ -38,6 +41,8 @@ export default function GenerateNotes({ onClose, auto }: { onClose: () => void; 
       } catch (e) { setDone((d) => [...d, { title: r.title, label: r.label, ok: false, text: (e as Error).message }]); }
     }
     setCurrent(''); setRunning(false);
+    // al añadir una marcha, se pasa solo a la pantalla de «Escuchar»
+    if (marchaId && !stopRef.current) setTimeout(onClose, 900);
   };
 
   const total = pending?.length ?? 0;

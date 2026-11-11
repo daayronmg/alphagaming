@@ -439,3 +439,39 @@ test('enlace de alta abierto: varias personas se apuntan con instrumento y voz, 
   await emilio(`/members/invitations/${inv.data.code}`, 'DELETE');
   assert.equal((await join({ name: 'Tarde', email: 'tarde@prueba.es', instrument_id: corneta.id, voice_id: corneta.voices[0].id })).status, 404);
 });
+
+test('marcha nueva desde un PDF con todas las secciones: cada voz apunta a sus páginas', async () => {
+  const emilio = await login('emilio@estrella.demo');
+  const m = await emilio('/library/marchas', 'POST', { title: 'Marcha de secciones', tags: [] });
+  assert.equal(m.status, 200);
+  const struct = (await emilio('/org/structure')).data;
+  const corneta = struct.flatMap((s: any) => s.instruments).find((i: any) => i.name === 'Corneta');
+  const trompeta = struct.flatMap((s: any) => s.instruments).find((i: any) => i.name === 'Trompeta');
+  const pdf = fs.readFileSync(path.resolve(import.meta.dirname, '../libretos/Corneta 3.pdf'));
+  const send = async (email: string, sections: any[], pages = 4) => {
+    const fd = new FormData();
+    fd.append('file', new Blob([pdf], { type: 'application/pdf' }), 'todas.pdf');
+    fd.append('page_count', String(pages)); fd.append('sections', JSON.stringify(sections));
+    return fetch(`${base}/library/marchas/${m.data.id}/sections`, { method: 'POST', headers: { 'x-estrella': '1', cookie: await cookieOf(email) }, body: fd });
+  };
+  const ok = await send('emilio@estrella.demo', [
+    { instrument_id: corneta.id, voice_id: corneta.voices[0].id, label: 'Corneta 1ª voz', from: 1, to: 2 },
+    { instrument_id: trompeta.id, voice_id: null, label: 'Trompeta', from: 3, to: 4 },
+  ]);
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).parts.length, 2);
+  // repetidas o páginas fuera del PDF: no
+  assert.equal((await send('emilio@estrella.demo', [{ instrument_id: trompeta.id, label: 'T', from: 1, to: 1 }, { instrument_id: trompeta.id, label: 'T2', from: 2, to: 2 }])).status, 400);
+  assert.equal((await send('emilio@estrella.demo', [{ instrument_id: trompeta.id, label: 'T', from: 3, to: 9 }])).status, 400);
+  // un componente no puede
+  assert.equal((await send('componente.a@estrella.demo', [{ instrument_id: trompeta.id, label: 'T', from: 1, to: 1 }])).status, 403);
+  // de nuevo la trompeta: queda como versión 2
+  await send('emilio@estrella.demo', [{ instrument_id: trompeta.id, voice_id: null, label: 'Trompeta', from: 3, to: 3 }]);
+  const parts = (await pool.query(`select label, page_from, page_to, version, active from parts where marcha_id = $1 order by label, version`, [m.data.id])).rows;
+  assert.deepEqual(parts.filter((p: any) => p.active).map((p: any) => [p.label, p.page_from, p.page_to, p.version]), [['Corneta 1ª voz', 1, 2, 1], ['Trompeta', 3, 3, 2]]);
+});
+
+async function cookieOf(email: string) {
+  const r = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ email, password: DEMO_PASSWORD }) });
+  return r.headers.get('set-cookie')!.split(';')[0];
+}

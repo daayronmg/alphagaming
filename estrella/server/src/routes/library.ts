@@ -264,6 +264,46 @@ libraryRouter.post('/marchas/:id/parts', manage, upload.single('file'), h(async 
 }));
 
 /**
+ * Un PDF con todas las secciones de una marcha (corneta 1ª, 2ª, trompeta…): se guarda una vez y cada
+ * instrumento y voz apunta a sus páginas. Si esa voz ya tenía partitura, queda como versión anterior.
+ */
+libraryRouter.post('/marchas/:id/sections', manage, upload.single('file'), h(async (req, res) => {
+  if (!req.file) throw new HttpError(400, 'Falta el PDF.');
+  const b = parse(z.object({
+    page_count: z.coerce.number().int().min(1).max(500),
+    sections: z.string().transform((s, ctx) => { try { return JSON.parse(s); } catch { ctx.addIssue({ code: 'custom', message: 'Secciones no válidas.' }); return z.NEVER; } })
+      .pipe(z.array(z.object({ instrument_id: z.number().int(), voice_id: z.number().int().nullable().optional(), label: z.string().trim().min(1).max(120),
+        from: z.number().int().min(1), to: z.number().int().min(1) })).min(1).max(60)),
+  }), req.body);
+  for (const x of b.sections) {
+    if (x.from > x.to || x.to > b.page_count) throw new HttpError(400, `Páginas no válidas en «${x.label}».`);
+    if (x.voice_id ? !(await one('select 1 from voices where id = $1 and instrument_id = $2', [x.voice_id, x.instrument_id])) : !(await one('select 1 from instruments where id = $1', [x.instrument_id]))) {
+      throw new HttpError(400, `Instrumento o voz no válidos en «${x.label}».`);
+    }
+  }
+  const keys = b.sections.map((x) => `${x.instrument_id}:${x.voice_id ?? ''}`);
+  if (new Set(keys).size !== keys.length) throw new HttpError(400, 'Hay dos secciones con el mismo instrumento y voz: júntalas o cambia una.');
+  const m = await one<any>('select id, owner_id from marchas where id = $1', [req.params.id]);
+  if (!m || m.owner_id) throw new HttpError(404, 'Marcha no encontrada.');
+  const parts = await tx(async (c) => {
+    const f = await storeFile(req.file!.buffer, req.file!.originalname, req.user!.id, ['pdf'], c);
+    const out: any[] = [];
+    for (const x of b.sections) {
+      const old = await one<any>('select id, version from parts where marcha_id = $1 and active and instrument_id = $2 and voice_id is not distinct from $3 for update', [m.id, x.instrument_id, x.voice_id ?? null], c);
+      if (old) await q('update parts set active = false where id = $1', [old.id], c);
+      const p = await one<any>(`insert into parts(marcha_id, instrument_id, voice_id, label, file_id, page_count, page_from, page_to, version, replaces_part_id, created_by)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
+        [m.id, x.instrument_id, x.voice_id ?? null, x.label, f.id, x.to - x.from + 1, x.from, x.to, old ? old.version + 1 : 1, old?.id ?? null, req.user!.id], c);
+      out.push(p.id);
+    }
+    await q('insert into marcha_changes(marcha_id, user_id, summary) values ($1,$2,$3)', [m.id, req.user!.id, `${b.sections.length} secciones añadidas desde un PDF`], c);
+    return out;
+  });
+  hub.toAll({ t: 'parts:changed', marchaId: m.id });
+  res.json({ parts });
+}));
+
+/**
  * Libreto: un PDF con muchas marchas de un mismo instrumento y voz. La dirección revisa en el navegador
  * qué páginas son de cada marcha; el PDF se guarda una sola vez, sin modificarlo, y cada marcha apunta a su
  * tramo de páginas. Se crea la marcha si no existe (se busca por título) y se añade —o se versiona— su partitura.
