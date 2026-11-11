@@ -23,12 +23,13 @@ const browser = await chromium.launch();
 const errors = [];
 async function session(email, viewport, label) {
   const ctx = await browser.newContext({ viewport, hasTouch: viewport.width < 800 });
+  await ctx.addInitScript(() => { try { localStorage.setItem('estrella.passkey.no', '1'); } catch {} }); // sin el aviso de Face ID
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`[${label}] ${e.message}`));
   await page.goto(`${BASE}/login`);
   await page.fill('input[name=usuario]', email);
   await page.fill('input[type=password]', PW);
-  await page.click('button:has-text("Entrar")');
+  await page.click('button:text-is("Entrar")');
   await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 10000 });
   // llamadas a la API con la sesión del propio usuario
   const api = async (path, method = 'GET', body) => page.evaluate(async ({ path, method, body }) => {

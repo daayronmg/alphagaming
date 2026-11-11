@@ -5,7 +5,7 @@ const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } }))
 p.on('pageerror', (e) => console.log('pageerror', e.message));
 await p.goto('http://localhost:5173/login');
 await p.fill('input[name=usuario]', 'emilio@estrella.demo'); await p.fill('input[type=password]', 'Estrella2026demo');
-await p.click('button:has-text("Entrar")'); await p.waitForURL((u) => !u.pathname.startsWith('/login'));
+await p.click('button:text-is("Entrar")'); await p.waitForURL((u) => !u.pathname.startsWith('/login'));
 const r = await p.evaluate(async () => (await (await fetch('/api/library/marchas?q=demostraci')).json()));
 const m = r.find((x) => x.title.includes('(ESTRELLA)'));
 const d = await p.evaluate(async (id) => (await (await fetch('/api/library/marchas/' + id)).json()), m.id);

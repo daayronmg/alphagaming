@@ -9,13 +9,14 @@ const b = await chromium.launch();
 let bad = 0;
 for (const [email, vp, tag] of [['emilio@estrella.demo', { width: 1280, height: 860 }, 'director'], ['componente.c@estrella.demo', { width: 1024, height: 800 }, 'responsable'], ['componente.a@estrella.demo', { width: 390, height: 844 }, 'componente']]) {
   const ctx = await b.newContext({ viewport: vp });
+  await ctx.addInitScript(() => { try { localStorage.setItem('estrella.passkey.no', '1'); } catch {} }); // sin el aviso de Face ID
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('response', (r) => { if (r.url().includes('/api/') && r.status() >= 500) errs.push(`HTTP ${r.status()} ${r.url()}`); });
   await p.goto(`${BASE}/login`);
   await p.fill('input[name=usuario]', email); await p.fill('input[type=password]', 'Estrella2026demo');
-  await p.click('button:has-text("Entrar")'); await p.waitForURL((u) => !u.pathname.startsWith('/login'));
+  await p.click('button:text-is("Entrar")'); await p.waitForURL((u) => !u.pathname.startsWith('/login'));
   const api = (path) => p.evaluate(async (path) => (await fetch('/api' + path)).json(), path);
   const marcha = (await api('/library/marchas?q=demostraci')).find((m) => m.title.includes('(ESTRELLA)'));
   const det = await api(`/library/marchas/${marcha.id}`);

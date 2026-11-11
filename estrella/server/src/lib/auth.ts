@@ -39,8 +39,8 @@ export const sha256 = (s: string) => crypto.createHash('sha256').update(s).diges
 export const randomToken = (bytes = 32) => crypto.randomBytes(bytes).toString('base64url');
 
 export function validatePassword(pw: string): string | null {
-  if (typeof pw !== 'string' || pw.length < 10) return 'La contraseña debe tener al menos 10 caracteres.';
-  if (!/[A-Za-zÁÉÍÓÚáéíóúñÑ]/.test(pw) || !/\d/.test(pw)) return 'La contraseña debe combinar letras y números.';
+  // Sin reglas raras: basta con 4 caracteres (el acceso diario es con la sesión guardada o Face ID)
+  if (typeof pw !== 'string' || pw.length < 4) return 'La contraseña debe tener al menos 4 caracteres.';
   return null;
 }
 

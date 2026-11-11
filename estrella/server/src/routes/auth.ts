@@ -78,15 +78,15 @@ authRouter.post('/join', h(async (req, res) => {
   const b = parse(z.object({
     code: z.string().min(6).max(80),
     name: z.string().trim().min(2, 'Escribe tu nombre y apellidos.').max(120),
-    phone: z.string().trim().max(30),
-    email: z.union([z.literal(''), z.string().trim().email('El correo no es válido.').max(200)]).optional(),
+    phone: z.string().trim().max(30).optional(),
+    email: z.string().trim().email('Escribe un correo válido: ahí te llegan los avisos de ensayos.').max(200),
     password: z.string().max(200),
     instrument_id: z.number().int(),
     voice_id: z.number().int().nullable().optional(),
   }), req.body);
   if (loginRateLimited(`join|${req.ip}`)) throw new HttpError(429, 'Demasiados intentos. Espera unos minutos.');
-  const k = phoneKey(b.phone);
-  if (!k) throw new HttpError(400, 'Escribe un número de teléfono válido.');
+  const k = b.phone ? phoneKey(b.phone) : null;
+  if (b.phone && !k) throw new HttpError(400, 'Escribe un número de teléfono válido.');
   const pwErr = validatePassword(b.password);
   if (pwErr) throw new HttpError(400, pwErr);
   const userId = await tx(async (c) => {
@@ -97,13 +97,13 @@ authRouter.post('/join', h(async (req, res) => {
     if (b.voice_id) {
       if (!(await one('select 1 from voices where id = $1 and instrument_id = $2', [b.voice_id, b.instrument_id], c))) throw new HttpError(400, 'La voz elegida no es de ese instrumento.');
     } else if (hasVoices) throw new HttpError(400, 'Elige tu voz.');
-    if (await one(`select 1 from users where right(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), 9) = $1`, [k], c)) {
+    if (k && await one(`select 1 from users where right(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), 9) = $1`, [k], c)) {
       throw new HttpError(409, 'Ya hay una cuenta con ese teléfono. Entra con él; si no recuerdas la contraseña, pídesela a la dirección.');
     }
-    const email = b.email ? b.email.toLowerCase() : `tel34${k}@sin-correo.bandaestrella.es`;
-    if (await one('select 1 from users where lower(email) = $1', [email], c)) throw new HttpError(409, 'Ya hay una cuenta con ese correo.');
+    const email = b.email.toLowerCase();
+    if (await one('select 1 from users where lower(email) = $1', [email], c)) throw new HttpError(409, 'Ya hay una cuenta con ese correo. Entra con él; si no recuerdas la contraseña, pulsa «¿Has olvidado la contraseña?».');
     const u = await one<any>(`insert into users(email, password_hash, name, role, joined_at, phone) values ($1,$2,$3,'member',current_date,$4) returning id`,
-      [email, hashPassword(b.password), b.name, b.phone], c);
+      [email, hashPassword(b.password), b.name, b.phone || null], c);
     const asg = [{ instrument_id: b.instrument_id, voice_id: b.voice_id ?? null, is_default: true }];
     await q('insert into user_assignments(user_id, instrument_id, voice_id, is_default) values ($1,$2,$3,true)', [u.id, b.instrument_id, b.voice_id ?? null], c);
     await q(`insert into assignment_changes(user_id, before, after, status, reason, requested_by, applied_by, applied_at) values ($1,'[]',$2,'aplicado','Alta con enlace de invitación',$1,$1,now())`, [u.id, JSON.stringify(asg)], c);
@@ -206,8 +206,10 @@ authRouter.put('/prefs', requireAuth, h(async (req, res) => {
 }));
 
 authRouter.put('/profile', requireAuth, h(async (req, res) => {
-  const b = parse(z.object({ phone: z.string().max(40).nullable().optional(), share_contact: z.boolean().optional() }), req.body);
-  await q('update users set phone = coalesce($2, phone), share_contact = coalesce($3, share_contact) where id = $1', [req.user!.id, b.phone ?? null, b.share_contact ?? null]);
+  const b = parse(z.object({ phone: z.string().max(40).nullable().optional(), share_contact: z.boolean().optional(), email: z.string().trim().email('Escribe un correo válido.').max(200).optional() }), req.body);
+  if (b.email && await one('select 1 from users where lower(email) = lower($1) and id <> $2', [b.email, req.user!.id])) throw new HttpError(409, 'Ese correo ya lo usa otra cuenta.');
+  await q('update users set phone = coalesce($2, phone), share_contact = coalesce($3, share_contact), email = coalesce(lower($4), email) where id = $1', [req.user!.id, b.phone ?? null, b.share_contact ?? null, b.email ?? null]);
+  if (b.email) forgetUser(req.user!.id);
   res.json({ ok: true });
 }));
 
