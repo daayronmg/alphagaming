@@ -374,8 +374,8 @@ test('notas leídas del PDF: se publican para la voz, se marcan los compases dud
   const pending = (await e('/scores/pdf/pending')).data;
   const row = pending.find((r: any) => r.marcha_id === m.id);
   assert.ok(row, 'la parte del libreto está pendiente de notas');
-  assert.equal(row.transposition, -2);
-  const content = { schema: 1, title: 'x', clef: 'treble', key: 3, time: [4, 4], tempo: 76, transposition: -2, measures: [
+  assert.equal(row.transposition, -1); // corneta de llaves Do/Reb: suena un semitono por debajo de lo escrito
+  const content = { schema: 1, title: 'x', clef: 'treble', key: 3, time: [4, 4], tempo: 76, transposition: -1, measures: [
     { id: 'm1', n: 1, notes: [{ id: 'n1', step: 'C', octave: 5, alter: 1, dur: 'h', dots: 1 }, { id: 'n2', rest: true, dur: 'q' }] },
     { id: 'm2', n: 2, notes: [{ id: 'n3', step: 'D', octave: 5, dur: '8', triplet: true }, { id: 'n4', step: 'D', octave: 5, dur: '8', triplet: true }, { id: 'n5', step: 'D', octave: 5, dur: '8', triplet: true }] },
   ] };

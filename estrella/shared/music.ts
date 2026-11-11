@@ -281,3 +281,13 @@ export function describeMeasures(doc: ScoreDoc, from: number, to: number): strin
     })
     .join('\n');
 }
+
+/**
+ * Corneta de llaves Do/Reb: posición con la que sale cada nota, por la altura a la que suena.
+ * «|» = posición de Do (armónicos de Do) y «—» = posición de Reb. Las demás notas no las da la corneta.
+ */
+const CORNET_DO = new Set([67, 72, 76, 79, 82, 84, 86, 88, 90]);
+const CORNET_REB = new Set([68, 73, 77, 80, 83, 85, 87, 89, 91]);
+export function cornetPosition(soundingMidi: number): '|' | '—' | null {
+  return CORNET_DO.has(soundingMidi) ? '|' : CORNET_REB.has(soundingMidi) ? '—' : null;
+}

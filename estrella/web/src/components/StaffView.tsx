@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, Beam, Dot, Articulation, Annotation, Barline, StaveTie, StaveText, Tuplet, Volta } from 'vexflow';
-import { accidentalsFor, staffPosition, placement, measureFill, measureCapacity, noteQuarters, DUR_QUARTERS, STEP_ES, type ScoreDoc, type Note } from '../../../shared/music';
+import { accidentalsFor, staffPosition, placement, measureFill, measureCapacity, noteQuarters, DUR_QUARTERS, STEP_ES, cornetPosition, midiOf, type ScoreDoc, type Note } from '../../../shared/music';
 
 const KEY_NAMES: Record<number, string> = { [-7]: 'Cb', [-6]: 'Gb', [-5]: 'Db', [-4]: 'Ab', [-3]: 'Eb', [-2]: 'Bb', [-1]: 'F', 0: 'C', 1: 'G', 2: 'D', 3: 'A', 4: 'E', 5: 'B', 6: 'F#', 7: 'C#' };
 const ART: Record<string, string> = { staccato: 'a.', accent: 'a>', tenuto: 'a-', marcato: 'a^', fermata: 'a@a' };
@@ -25,6 +25,8 @@ interface Props {
   compact?: boolean;
   /** escribe el nombre de cada nota (Do, Re♯…) debajo */
   noteNames?: boolean;
+  /** corneta Do/Reb: debajo del nombre, la posición de la llave (| Do, — Reb) */
+  cornetKeys?: boolean;
   /** alto disponible en píxeles: la partitura entera se ajusta para caber sin desplazarse (ignora `scale`) */
   fitHeight?: number;
 }
@@ -54,7 +56,7 @@ export default function StaffView(p: Props) {
   const [width, setWidth] = useState(800);
   const [rects, setRects] = useState<MeasureRect[]>([]);
   const fit = p.fitHeight != null;
-  const lineH = fit ? (p.noteNames ? 124 : 104) : p.compact ? 120 : 140;
+  const lineH = (fit ? (p.noteNames ? 124 : 104) : p.compact ? 120 : 140) + (p.noteNames && p.cornetKeys ? 16 : 0);
   const shown = useMemo(() => p.doc.measures.slice(0, p.maxMeasures ?? p.doc.measures.length), [p.doc, p.maxMeasures]);
   // modo «marcha completa»: la escala más grande con la que todas las líneas caben en el alto disponible
   const scale = useMemo(() => {
@@ -128,6 +130,10 @@ export default function StaffView(p: Props) {
           if (p.noteNames && !n.rest && n.step && doc.clef !== 'percussion') {
             const nm = new Annotation(`${STEP_ES[n.step]}${(n.alter ?? 0) > 0 ? '♯' : (n.alter ?? 0) < 0 ? '♭' : ''}`);
             nm.setFont('Inter', 10, 'bold'); nm.setVerticalJustification(Annotation.VerticalJustify.BOTTOM); sn.addModifier(nm, 0);
+            if (p.cornetKeys) {
+              const pos = cornetPosition(midiOf(n.step, n.octave!, n.alter ?? 0) + doc.transposition);
+              if (pos) { const k = new Annotation(pos); k.setFont('Inter', 11, 'bold'); k.setVerticalJustification(Annotation.VerticalJustify.BOTTOM); sn.addModifier(k, 0); }
+            }
           }
           if (n.dyn) { const an = new Annotation(n.dyn); an.setFont('Times', 13, 'bold', 'italic'); an.setVerticalJustification(Annotation.VerticalJustify.BOTTOM); sn.addModifier(an, 0); }
           let color: string | null = null;
@@ -167,7 +173,7 @@ export default function StaffView(p: Props) {
       });
     });
     setRects(out);
-  }, [p.doc, width, p.colorMode, p.selectedNoteId, p.playingNoteId, scale, p.changedNoteIds, shown, lineH, p.noteNames]);
+  }, [p.doc, width, p.colorMode, p.selectedNoteId, p.playingNoteId, scale, p.changedNoteIds, shown, lineH, p.noteNames, p.cornetKeys]);
 
   const click = (e: React.MouseEvent) => {
     const g = (e.target as Element).closest('.vf-stavenote');

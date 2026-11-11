@@ -147,7 +147,7 @@ function cornetaReal(c: AudioContext, dest: AudioNode, freq: number, t: number, 
   // notas más largas que la grabación: se repite la parte central, ya estable
   if (dur * rate > best.dur - 0.2) { src.loop = true; src.loopStart = best.start + 0.8; src.loopEnd = best.start + best.dur - 0.2; }
   const g = c.createGain();
-  const peak = 0.75 * vel, a = 0.012, rel = Math.min(0.09, dur * 0.3);
+  const peak = 0.6 * vel, a = 0.012, rel = Math.min(0.09, dur * 0.3);
   g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a);
   g.gain.setValueAtTime(peak, Math.max(t + a, end - rel)); g.gain.linearRampToValueAtTime(0.0001, end);
   const wet = c.createGain(); wet.gain.value = 0.35; // la grabación ya trae su sala: solo un poco de eco
