@@ -245,10 +245,13 @@ export default function ScoreCanvas(props: Props) {
   useLayoutEffect(() => {
     const el = wrap.current?.parentElement;
     if (!el) return;
-    const ro = new ResizeObserver(() => setAvail(Math.max(280, el.clientWidth - 36)));
+    // el margen del visor se reduce en móvil; se mide al aparecer el contenedor (tras cargar el PDF) y en cada giro
+    const measure = () => { const cs = getComputedStyle(el); setAvail(Math.max(280, el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight))); };
+    measure();
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [!!pages, err]); // eslint-disable-line
 
   const width = Math.round(Math.min(avail, 1100) * props.zoom);
 
