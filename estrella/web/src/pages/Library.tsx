@@ -46,7 +46,7 @@ export default function Library() {
       {list.data && !list.data.length && <Empty icon={<Music size={36} />} title="No hay marchas con esos criterios">{can('library.manage') ? 'Crea la primera marcha y sube sus partituras.' : 'La dirección todavía no ha subido repertorio.'}</Empty>}
       <div className="grid cols-3">
         {(list.data ?? []).map((m) => (
-          <Link key={m.id} to={can('library.manage') ? `/marchas/${m.id}` : `/tocar/${m.id}`} className="card hover stack sm">
+          <Link key={m.id} to={`/tocar/${m.id}`} className="card hover stack sm">
             <div className="row between nowrap">
               <h3 className="ellipsis" style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 600 }}>{m.title}</h3>
               {m.favorite && <Star size={16} fill="var(--accent)" color="var(--accent)" />}
