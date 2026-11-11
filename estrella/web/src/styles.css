@@ -530,3 +530,18 @@ button.march-row { width: 100%; background: none; border: 0; border-bottom: 1px 
 .bottom-nav .nav-home.active { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 2px var(--accent); }
 .bottom-nav .nav-avatar { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: var(--gold-2); color: #111; font-size: .62rem; font-weight: 800; }
 .bottom-nav .nav-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.faceid-btn { gap: 10px; }
+.or-sep { display: flex; align-items: center; gap: 10px; color: var(--text-3); font-size: .78rem; }
+.or-sep::before, .or-sep::after { content: ''; flex: 1; height: 1px; background: var(--line-2); }
+/* Barra inferior como las apps de bandas: blanca, a todo el ancho, solo iconos; el activo en verde */
+.bottom-nav { left: 0; right: 0; bottom: 0; transform: none; width: auto; border-radius: 0; border: 0; border-top: 1px solid var(--line-2); padding: 6px 8px calc(6px + var(--safe-b)); background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
+.bottom-nav a, .bottom-nav button { min-height: 52px; color: var(--text-3); border-radius: 14px; }
+.bottom-nav .active { background: none; color: var(--ok); }
+.bottom-nav .nav-home img { width: 40px; height: 40px; }
+.bottom-nav .nav-home.active { background: none; box-shadow: none; }
+.bottom-nav .nav-home.active img { filter: drop-shadow(0 0 0 transparent); transform: scale(1.08); }
+.bottom-nav .dot { top: 8px; right: calc(50% - 16px); }
+@media (min-width: 700px) { .bottom-nav { left: 0; right: 0; transform: none; width: auto; } .bottom-nav a, .bottom-nav button { min-height: 56px; } }
+.ins-card .ins-ico { display: grid; place-items: center; }
+.ins-card.on { background: color-mix(in srgb, var(--ok) 10%, var(--surface)); border-color: var(--ok); color: inherit; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+:root[data-theme='dark'] .ins-card.on { background: color-mix(in srgb, var(--ok) 18%, var(--surface)); border-color: var(--ok); color: inherit; }

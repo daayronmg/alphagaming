@@ -408,25 +408,34 @@ test('enlace de alta abierto: varias personas se apuntan con instrumento y voz, 
   assert.equal(info.open, true);
   const corneta = info.instruments.find((i: any) => i.name === 'Corneta');
   assert.ok(corneta && corneta.voices.length >= 3);
-  const join = (body: any) => fetch(`${base}/auth/join`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ code: inv.data.code, password: 'cornetas2026', ...body }) });
+  const join = (body: any) => fetch(`${base}/auth/join`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ code: inv.data.code, password: '1234', ...body }) });
   // la voz es obligatoria si el instrumento tiene voces
-  assert.equal((await join({ name: 'Ana Prueba', phone: '611 22 33 44', instrument_id: corneta.id })).status, 400);
-  const r1 = await join({ name: 'Ana Prueba', phone: '611 22 33 44', instrument_id: corneta.id, voice_id: corneta.voices[2].id, role: 'director' });
+  assert.equal((await join({ name: 'Ana Prueba', email: 'ana@prueba.es', phone: '611 22 33 44', instrument_id: corneta.id })).status, 400);
+  // el correo es obligatorio (ahí llegan los avisos)
+  assert.equal((await join({ name: 'Ana Prueba', phone: '611 22 33 44', instrument_id: corneta.id, voice_id: corneta.voices[2].id })).status, 400);
+  const r1 = await join({ name: 'Ana Prueba', email: 'ana@prueba.es', phone: '611 22 33 44', instrument_id: corneta.id, voice_id: corneta.voices[2].id, role: 'director' });
   assert.equal(r1.status, 200);
-  const r2 = await join({ name: 'Luis Prueba', phone: '+34 622 33 44 55', email: 'luis@prueba.es', instrument_id: corneta.id, voice_id: corneta.voices[0].id });
+  const r2 = await join({ name: 'Luis Prueba', email: 'luis@prueba.es', instrument_id: corneta.id, voice_id: corneta.voices[0].id });
   assert.equal(r2.status, 200);
   // mismo teléfono: no se duplica
-  assert.equal((await join({ name: 'Otra', phone: '611223344', instrument_id: corneta.id, voice_id: corneta.voices[0].id })).status, 409);
+  assert.equal((await join({ name: 'Otra', email: 'otra@prueba.es', phone: '611223344', instrument_id: corneta.id, voice_id: corneta.voices[0].id })).status, 409);
   const ana = (await pool.query(`select u.role, a.voice_id from users u join user_assignments a on a.user_id = u.id where u.phone = '611 22 33 44'`)).rows[0];
   assert.equal(ana.role, 'member');
   assert.equal(ana.voice_id, corneta.voices[2].id);
   // entra con su teléfono
-  const li = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ email: '611223344', password: 'cornetas2026' }) });
+  const li = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ email: '611223344', password: '1234' }) });
   assert.equal(li.status, 200);
   // el enlace abierto no sirve para el registro clásico y, anulado, deja de valer
   assert.equal((await fetch(`${base}/auth/register`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ code: inv.data.code, name: 'Xavier', email: 'x@x.es', password: 'cornetas2026' }) })).status, 404);
+  // mismo correo: no se duplica
+  assert.equal((await join({ name: 'Luis Otra Vez', email: 'LUIS@prueba.es', instrument_id: corneta.id, voice_id: corneta.voices[0].id })).status, 409);
+  // Face ID: sin credencial registrada no entra nadie
+  const opt = await (await fetch(`${base}/auth/passkey/login/options`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1', origin: 'http://localhost:5173' }, body: '{}' })).json();
+  assert.ok(opt.options.challenge && opt.challengeId);
+  const bad = await fetch(`${base}/auth/passkey/login/verify`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1', origin: 'http://localhost:5173' }, body: JSON.stringify({ challengeId: opt.challengeId, response: { id: 'nope', rawId: 'nope', type: 'public-key', response: {} } }) });
+  assert.equal(bad.status, 401);
   const list = await emilio('/members/invitations/list');
   assert.equal(list.data.find((i: any) => i.code === inv.data.code).uses, 2);
   await emilio(`/members/invitations/${inv.data.code}`, 'DELETE');
-  assert.equal((await join({ name: 'Tarde', phone: '633 44 55 66', instrument_id: corneta.id, voice_id: corneta.voices[0].id })).status, 404);
+  assert.equal((await join({ name: 'Tarde', email: 'tarde@prueba.es', instrument_id: corneta.id, voice_id: corneta.voices[0].id })).status, 404);
 });

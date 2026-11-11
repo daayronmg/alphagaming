@@ -5,7 +5,7 @@ const p = await (await b.newContext({ viewport: { width: 1280, height: 860 } }))
 p.on('pageerror', (e) => console.log('pageerror', e.message));
 await p.goto('http://localhost:5173/login');
 await p.fill('input[name=usuario]', 'emilio@estrella.demo'); await p.fill('input[type=password]', 'Estrella2026demo');
-await p.click('button:has-text("Entrar")'); await p.waitForURL((u) => !u.pathname.startsWith('/login'));
+await p.click('button:text-is("Entrar")'); await p.waitForURL((u) => !u.pathname.startsWith('/login'));
 const api = (path, method = 'GET', body) => p.evaluate(async ({ path, method, body }) => (await (await fetch('/api' + path, { method, headers: { 'x-estrella': '1', 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })).json()), { path, method, body });
 for (const l of await api('/live/active')) await api(`/live/${l.id}/end`, 'POST', {});
 const m = (await api('/library/marchas?q=demostraci')).find((x) => x.title.includes('(ESTRELLA)'));

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   Home, CalendarDays, Library, Radio, Megaphone, MessageCircleQuestion, GraduationCap, Bot, Users, BarChart3,
-  Settings, Shield, Package, LogOut, Moon, Sun, Wifi, WifiOff, RefreshCw, Siren, CloudUpload, Baton,
+  Settings, Shield, Package, LogOut, Moon, Sun, Wifi, WifiOff, RefreshCw, Siren, CloudUpload, Baton, Music, Bell, UserRound,
 } from './icons';
 import { useAuth } from '../lib/auth';
 import { rt, useConn, useRealtime } from '../lib/realtime';
@@ -10,6 +10,7 @@ import { get, post, fileUrl } from '../lib/api';
 import { useToast, Modal } from './ui';
 import { onOutbox, pending } from '../lib/offline';
 import { initials } from '../lib/format';
+import { PasskeyOffer } from './PasskeyOffer';
 
 export function useTheme(): ['dark' | 'light', () => void] {
   const [t, setT] = useState<'dark' | 'light'>(() => (localStorage.getItem('estrella.theme') as any) || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
@@ -172,15 +173,13 @@ export default function Layout() {
         <Outlet />
       </div>
       <nav className="bottom-nav">
-        {[visible[1], visible[2]].map((l) => (
-          <NavLink key={l.to} to={l.to} className={({ isActive }) => (isActive ? 'active' : '')}>{l.icon}<span>{l.label}</span></NavLink>
-        ))}
-        <NavLink to="/" end className={({ isActive }) => `nav-home ${isActive ? 'active' : ''}`} aria-label="Inicio"><img src={logoUrl(branding)} alt="" /><span>Inicio</span></NavLink>
-        <NavLink to={visible[3].to} className={({ isActive }) => (isActive ? 'active' : '')}>{visible[3].icon}<span>{director ? 'Dirigir' : 'Ensayo'}</span>{!!visible[3].count && <span className="dot" />}</NavLink>
-        <button onClick={() => setMore(true)} aria-label="Perfil y más opciones">
-          <span className="nav-avatar">{me.photo_file_id ? <img src={fileUrl(me.photo_file_id)} alt="" /> : initials(me.name)}</span><span>Perfil</span>{(unread > 0 || doubtCount > 0) && <span className="dot" />}
-        </button>
+        <NavLink to="/calendario" className={({ isActive }) => (isActive ? 'active' : '')} aria-label="Agenda"><CalendarDays size={26} /></NavLink>
+        <NavLink to="/biblioteca" className={({ isActive }) => (isActive ? 'active' : '')} aria-label="Marchas"><Music size={26} /></NavLink>
+        <NavLink to="/" end className={({ isActive }) => `nav-home ${isActive ? 'active' : ''}`} aria-label="Inicio"><img src={logoUrl(branding)} alt="" /></NavLink>
+        <NavLink to="/avisos" className={({ isActive }) => (isActive ? 'active' : '')} aria-label="Avisos"><Bell size={26} />{unread > 0 && <span className="dot" />}</NavLink>
+        <button onClick={() => setMore(true)} aria-label="Perfil y más opciones" className={more ? 'active' : ''}><UserRound size={26} />{doubtCount > 0 && <span className="dot" />}</button>
       </nav>
+      {loc.pathname === '/' && !live && <PasskeyOffer />}
       {more && (
         <Modal title={appName} onClose={() => setMore(false)}>
           <div className="stack sm">

@@ -5,13 +5,14 @@ const OUT = process.env.OUT || '.';
 const b = await chromium.launch();
 const login = async (email, viewport) => {
   const ctx = await b.newContext({ viewport });
+  await ctx.addInitScript(() => { try { localStorage.setItem('estrella.passkey.no', '1'); } catch {} }); // sin el aviso de Face ID
   const p = await ctx.newPage();
   p.on('console', (m) => { if (m.type() === 'error') console.log(`[${email}] console:`, m.text()); });
   p.on('pageerror', (e) => console.log(`[${email}] pageerror:`, e.message));
   await p.goto(`${BASE}/login`);
   await p.fill('input[name=usuario]', email);
   await p.fill('input[type=password]', 'Estrella2026demo');
-  await p.click('button:has-text("Entrar")');
+  await p.click('button:text-is("Entrar")');
   await p.waitForURL((u) => !u.pathname.startsWith('/login'));
   return p;
 };

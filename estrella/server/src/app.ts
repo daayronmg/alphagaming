@@ -11,6 +11,7 @@ import { rsvpLinkRouter } from './lib/rsvpMail.ts';
 import { privacyGuard } from './lib/privacy.ts';
 import { errorHandler } from './lib/http.ts';
 import { authRouter } from './routes/auth.ts';
+import { passkeyRouter } from './routes/passkeys.ts';
 import { orgRouter } from './routes/org.ts';
 import { membersRouter } from './routes/members.ts';
 import { libraryRouter } from './routes/library.ts';
@@ -55,6 +56,7 @@ export function createApp() {
   });
   // respuestas JSON de la API comprimidas (los PDF y audios ya van comprimidos o se cachean en el móvil)
   app.use('/api', compression({ threshold: 1024, level: 6, filter: (req, res) => !req.path.startsWith('/files') && compression.filter(req, res) }));
+  app.use('/api/auth/passkey', passkeyRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/org', orgRouter);
   app.use('/api/members', membersRouter);

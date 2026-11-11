@@ -5,6 +5,8 @@ import { useAuth } from '../lib/auth';
 import { useLoad, Field, useToast, Notice } from '../components/ui';
 import { fmtDateTime, assignmentLabel } from '../lib/format';
 import { autoFollowEnabled } from '../components/Layout';
+import { ScanFace } from '../components/icons';
+import { passkeySupported, addPasskey, myPasskeys, passkeyError, unlockName } from '../lib/passkey';
 
 export default function Settings() {
   const { me, prefs, setPrefs, refresh } = useAuth();
@@ -13,6 +15,9 @@ export default function Settings() {
   const [pw, setPw] = useState({ current: '', password: '', password2: '' });
   const [follow, setFollow] = useState(autoFollowEnabled());
   const [phone, setPhone] = useState(me?.phone ?? '');
+  const noEmail = !!me && /@sin-correo\./.test(me.email);
+  const [email, setEmail] = useState(noEmail ? '' : me?.email ?? '');
+  const keys = useLoad(() => myPasskeys(), []);
   if (!me) return null;
   const savePrefs = async (p: typeof prefs) => { setPrefs(p); try { await put('/auth/prefs', p); } catch (e) { toast({ kind: 'error', text: (e as Error).message }); } };
   const cats: Record<string, string> = { avisos: 'Avisos no urgentes', eventos: 'Cambios en eventos', dudas: 'Respuestas a mis dudas', partituras: 'Nuevas versiones de partituras' };
@@ -21,12 +26,20 @@ export default function Settings() {
       <div className="page-head"><div><div className="eyebrow">Personal</div><h1>Mi cuenta</h1></div></div>
       <div className="card stack">
         <h3><UserRound size={18} /> Perfil</h3>
-        <div className="small">{me.name} · {me.email}</div>
+        <div className="small">{me.name}</div>
+        {noEmail && <Notice kind="warn" title="Pon tu correo">Sin correo no te llegan los avisos de ensayos ni los botones de Voy / No voy.</Notice>}
+        <div className="form-grid"><Field label="Correo"><input className="input" type="email" autoCapitalize="none" value={email} onChange={(e) => setEmail(e.target.value)} /></Field></div>
         <div className="small muted">Asignación: {me.assignments.map(assignmentLabel).join(', ') || 'sin asignar'} (solo la dirección puede cambiarla)</div>
         <div className="form-grid"><Field label="Teléfono"><input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} /></Field></div>
         <label className="checkbox"><input type="checkbox" checked={me.share_contact} onChange={async (e) => { await put('/auth/profile', { share_contact: e.target.checked }); refresh(); }} /> Compartir mi correo y teléfono con los demás componentes</label>
-        <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={async () => { await put('/auth/profile', { phone }); refresh(); toast({ kind: 'ok', text: 'Guardado' }); }}>Guardar</button>
+        <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={async () => { try { await put('/auth/profile', { phone, ...(email && email !== me.email ? { email } : {}) }); refresh(); toast({ kind: 'ok', text: 'Guardado' }); } catch (e) { toast({ kind: 'error', text: (e as Error).message }); } }}>Guardar</button>
       </div>
+      {passkeySupported() && <div className="card stack">
+        <h3><ScanFace size={18} /> Entrar con {unlockName()}</h3>
+        {(keys.data ?? []).map((k) => <div key={k.id} className="row small"><span className="grow">{k.device || 'Dispositivo'} · activado {fmtDateTime(k.created_at)}</span><button className="btn sm" onClick={async () => { await del(`/auth/passkey/${encodeURIComponent(k.id)}`); keys.reload(); }}>Quitar</button></div>)}
+        {!keys.data?.length && <p className="small muted" style={{ margin: 0 }}>Actívalo y entrarás sin escribir la contraseña.</p>}
+        <button className="btn sm primary" style={{ alignSelf: 'flex-start' }} onClick={async () => { try { await addPasskey(); keys.reload(); toast({ kind: 'ok', text: 'Activado en este dispositivo' }); } catch (e) { const m = passkeyError(e); if (m) toast({ kind: 'error', text: m }); } }}><ScanFace size={16} /> Activar en este dispositivo</button>
+      </div>}
       <div className="card stack">
         <h3><Bell size={18} /> Notificaciones</h3>
         <label className="checkbox"><input type="checkbox" checked={prefs.mute_non_urgent} onChange={(e) => savePrefs({ ...prefs, mute_non_urgent: e.target.checked })} /> Silenciar todas las notificaciones no urgentes</label>

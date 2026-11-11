@@ -4,6 +4,9 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Field, Notice } from '../components/ui';
+import { passkeySupported, loginWithPasskey, passkeyError, unlockName } from '../lib/passkey';
+import { ScanFace } from '../components/icons';
+import { InstrumentIcon } from '../components/InstrumentIcon';
 
 function Shell({ children }: { children: ReactNode }) {
   const { branding } = useAuth();
@@ -36,14 +39,24 @@ export function Login() {
     try { await post('/auth/login', { email, password }); await refresh(); }
     catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   };
+  const faceId = async () => {
+    setErr(''); setBusy(true);
+    try { await loginWithPasskey(); await refresh(); }
+    catch (e) { const m = passkeyError(e); if (m) setErr(m); } finally { setBusy(false); }
+  };
+  const canPasskey = passkeySupported();
   return (
     <Shell>
       <form className="card stack" onSubmit={submit}>
-        <div><h2>Iniciar sesión</h2><p className="muted small">Usa la cuenta que te ha facilitado la dirección.</p></div>
+        <div><h2>Iniciar sesión</h2><p className="muted small">Entra con tu correo o tu teléfono.</p></div>
         {err && <Notice kind="danger">{err}</Notice>}
+        {canPasskey && <>
+          <button type="button" className="btn primary lg faceid-btn" onClick={faceId} disabled={busy}><ScanFace size={22} /> Entrar con {unlockName()}</button>
+          <div className="or-sep"><span>o con contraseña</span></div>
+        </>}
         <Field label="Correo o teléfono"><input className="input" name="usuario" type="text" inputMode="email" autoCapitalize="none" autoCorrect="off" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
         <Field label="Contraseña"><input className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
-        <button className="btn primary lg" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
+        <button className={`btn lg ${canPasskey ? '' : 'primary'}`} disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
         <div className="row between small"><Link className="muted" to="/recuperar">¿Has olvidado la contraseña?</Link><Link className="muted" to="/registro">Tengo una invitación</Link></div>
       </form>
     </Shell>
@@ -77,7 +90,7 @@ export function Register() {
         {inv && <Notice kind="ok" title="Invitación válida">{inv.instrument ? `Asignación: ${inv.instrument}${inv.voice ? ` · ${inv.voice}` : ''}` : 'Completa tus datos.'}</Notice>}
         <Field label="Nombre y apellidos"><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required /></Field>
         <Field label="Correo electrónico"><input className="input" type="email" value={f.email} readOnly={!!inv?.email} onChange={(e) => setF({ ...f, email: e.target.value })} required /></Field>
-        <Field label="Contraseña" hint="Mínimo 10 caracteres, con letras y números."><input className="input" type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required /></Field>
+        <Field label="Contraseña" hint="Mínimo 4 caracteres."><input className="input" type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required /></Field>
         <Field label="Repite la contraseña"><input className="input" type="password" autoComplete="new-password" value={f.password2} onChange={(e) => setF({ ...f, password2: e.target.value })} required /></Field>
         <button className="btn primary lg" disabled={!inv}>Activar cuenta</button>
         <Link className="muted small" to="/login">Volver</Link>
@@ -86,9 +99,6 @@ export function Register() {
   );
 }
 
-const ICONS: Record<string, string> = { corneta: '📯', trompeta: '🎺', 'trombón': '🎺', trombon: '🎺', bombardino: '🎺', tuba: '🎺', fliscorno: '🎺', caja: '🥁', bombo: '🥁', platos: '🔔' };
-const iconFor = (name: string) => ICONS[name.toLowerCase()] ?? '🎵';
-
 /** Alta con el enlace que comparte la dirección: datos, instrumento y voz. */
 export function Join() {
   const { code = '' } = useParams();
@@ -96,7 +106,7 @@ export function Join() {
   const nav = useNavigate();
   const [inv, setInv] = useState<any>(null);
   const [loadErr, setLoadErr] = useState('');
-  const [f, setF] = useState({ name: '', phone: '', email: '', password: '', password2: '' });
+  const [f, setF] = useState({ name: '', phone: '', email: '', password: '' });
   const [ins, setIns] = useState<number | null>(null);
   const [voice, setVoice] = useState<number | null>(null);
   const [err, setErr] = useState('');
@@ -108,7 +118,6 @@ export function Join() {
   const instrument = inv?.instruments?.find((i: any) => i.id === ins);
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setErr('');
-    if (f.password !== f.password2) return setErr('Las contraseñas no coinciden.');
     if (!ins) return setErr('Elige tu instrumento.');
     if (instrument?.voices.length && !voice) return setErr('Elige tu voz.');
     setBusy(true);
@@ -123,15 +132,14 @@ export function Join() {
       <form className="card stack join-form" onSubmit={submit}>
         <div><h2>Completa tu perfil</h2><p className="muted small">Pon tus datos e indica el instrumento que tocas y estarás listo para empezar.</p></div>
         <Field label="Nombre y apellidos"><input className="input" autoComplete="name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required /></Field>
-        <Field label="Teléfono" hint="Con él entrarás en la app."><input className="input" type="tel" inputMode="tel" autoComplete="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} required /></Field>
-        <Field label="Correo (opcional)" hint="Para recibir los avisos de ensayos."><input className="input" type="email" autoCapitalize="none" autoComplete="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
-        <Field label="Contraseña" hint="Mínimo 10 caracteres, con letras y números."><input className="input" type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required /></Field>
-        <Field label="Repite la contraseña"><input className="input" type="password" autoComplete="new-password" value={f.password2} onChange={(e) => setF({ ...f, password2: e.target.value })} required /></Field>
+        <Field label="Correo" hint="Aquí te llegan los avisos de ensayos y actuaciones."><input className="input" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" autoComplete="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required /></Field>
+        <Field label="Contraseña" hint="La que quieras (mínimo 4). Luego podrás entrar con Face ID."><input className="input" type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required minLength={4} /></Field>
+        <Field label="Teléfono (opcional)" hint="Para entrar también con tu número."><input className="input" type="tel" inputMode="tel" autoComplete="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></Field>
         <div className="join-label">¿Qué tocas?</div>
         <div className="ins-grid">
           {inv.instruments.map((i: any) => (
             <button type="button" key={i.id} className={`ins-card ${ins === i.id ? 'on' : ''}`} aria-pressed={ins === i.id} onClick={() => { setIns(i.id); setVoice(null); }}>
-              <span className="ins-ico" aria-hidden>{iconFor(i.name)}</span><span>{i.name}</span>
+              <span className="ins-ico"><InstrumentIcon name={i.name} size={52} /></span><span>{i.name}</span>
             </button>
           ))}
         </div>
@@ -179,7 +187,7 @@ export function Reset() {
         <h2>Nueva contraseña</h2>
         {ok ? <Notice kind="ok">Contraseña cambiada. Ya puedes iniciar sesión.</Notice> : <>
           {err && <Notice kind="danger">{err}</Notice>}
-          <Field label="Nueva contraseña" hint="Mínimo 10 caracteres, con letras y números."><input className="input" type="password" autoComplete="new-password" value={p} onChange={(e) => setP(e.target.value)} required /></Field>
+          <Field label="Nueva contraseña" hint="Mínimo 4 caracteres."><input className="input" type="password" autoComplete="new-password" value={p} onChange={(e) => setP(e.target.value)} required /></Field>
           <Field label="Repite la contraseña"><input className="input" type="password" autoComplete="new-password" value={p2} onChange={(e) => setP2(e.target.value)} required /></Field>
           <button className="btn primary lg">Guardar</button>
         </>}
