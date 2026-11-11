@@ -24,6 +24,7 @@ export function unlockAudio() {
   }
   keepAlive.play().catch(() => {});
   audioCtx();
+  loadCornetSamples();
 }
 
 export function audioCtx(): AudioContext {
@@ -110,8 +111,54 @@ function street(c: AudioContext): ConvolverNode {
   return (streetVerb = v);
 }
 
+// ===== Corneta real: notas grabadas de una corneta de llaves (cedidas con permiso) =====
+interface CornetSample { start: number; dur: number; f0: number }
+let cornetBuf: AudioBuffer | null = null;
+let cornetNotes: CornetSample[] = [];
+let cornetLoading: Promise<boolean> | null = null;
+/** Descarga y prepara las notas grabadas (una sola vez; se puede llamar antes del primer toque). */
+export function loadCornetSamples(): Promise<boolean> {
+  if (cornetLoading) return cornetLoading;
+  cornetLoading = (async () => {
+    const [meta, data] = await Promise.all([
+      fetch('/sounds/corneta.json').then((r) => { if (!r.ok) throw new Error('sin notas'); return r.json(); }),
+      fetch('/sounds/corneta.mp3').then((r) => { if (!r.ok) throw new Error('sin audio'); return r.arrayBuffer(); }),
+    ]);
+    // se decodifica fuera del contexto principal: no hace falta que el usuario haya tocado nada todavía
+    const dec = new OfflineAudioContext(1, 1, 44100);
+    cornetBuf = await new Promise<AudioBuffer>((res, rej) => dec.decodeAudioData(data, res, rej));
+    cornetNotes = meta.notes;
+    return true;
+  })().catch((e) => { console.warn('[audio] notas de corneta no disponibles', e); cornetLoading = null; return false; });
+  return cornetLoading;
+}
+export const cornetSamplesReady = () => !!cornetBuf;
+
+/** Toca la nota con la grabación más cercana, afinada a la altura exacta. Devuelve false si aún no hay grabaciones. */
+function cornetaReal(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vel: number): boolean {
+  if (!cornetBuf || !cornetNotes.length) return false;
+  let best = cornetNotes[0];
+  for (const n of cornetNotes) if (Math.abs(Math.log(freq / n.f0)) < Math.abs(Math.log(freq / best.f0))) best = n;
+  const rate = freq / best.f0;
+  const end = t + dur;
+  const src = c.createBufferSource();
+  src.buffer = cornetBuf;
+  src.playbackRate.value = rate;
+  // notas más largas que la grabación: se repite la parte central, ya estable
+  if (dur * rate > best.dur - 0.2) { src.loop = true; src.loopStart = best.start + 0.8; src.loopEnd = best.start + best.dur - 0.2; }
+  const g = c.createGain();
+  const peak = 0.75 * vel, a = 0.012, rel = Math.min(0.09, dur * 0.3);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a);
+  g.gain.setValueAtTime(peak, Math.max(t + a, end - rel)); g.gain.linearRampToValueAtTime(0.0001, end);
+  const wet = c.createGain(); wet.gain.value = 0.35; // la grabación ya trae su sala: solo un poco de eco
+  src.connect(g); g.connect(dest); g.connect(wet); wet.connect(street(c));
+  src.start(t, best.start); src.stop(end + 0.05);
+  return true;
+}
+
 function corneta(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vel = 0.8) {
   const end = t + dur;
+  if (cornetaReal(c, dest, freq, t, dur, vel)) return;
   const o = c.createOscillator(); o.setPeriodicWave(cornetTone(c, freq));
   // ataque de lengua: la nota entra un poco baja y sube en seguida
   o.frequency.setValueAtTime(freq * 0.972, t); o.frequency.exponentialRampToValueAtTime(freq, t + 0.045);
@@ -193,6 +240,7 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
   onMeasure?: (n: number) => void; onNote?: (id: string | null) => void; onEnd?: () => void;
 }): ScorePlayback {
   const c = audioCtx();
+  loadCornetSamples(); // por si aún no se habían pedido (las primeras notas pueden salir sintetizadas)
   const master = c.createGain(); master.gain.value = 1; master.connect(output(c));
   const doc0 = parts[0].doc;
   const beatsPerMeasure = doc0.time[0];

@@ -6,7 +6,7 @@ import { useAuth } from '../lib/auth';
 import { useLoad, Spinner, ErrorBox, Notice, useToast, Modal, Field } from '../components/ui';
 import StaffView from '../components/StaffView';
 import AudioPlayer from '../components/AudioPlayer';
-import { playScores, unlockAudio, type ScorePlayback } from '../lib/audio';
+import { playScores, unlockAudio, loadCornetSamples, cornetSamplesReady, type ScorePlayback } from '../lib/audio';
 import { transcribePdf } from '../lib/pdf';
 import { useRealtime } from '../lib/realtime';
 import type { ScoreDoc } from '../../../shared/music';
@@ -123,6 +123,8 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   // si la dirección corrige las notas, se ven al momento
   useRealtime((x) => { if (['parts:changed', 'score:published'].includes(x.t) && x.marchaId === id) { m.reload(); score.reload(); } }, [id, scoreId]);
   useEffect(() => () => pb.current?.stop(), []);
+  // las notas grabadas de corneta se descargan al abrir la marcha, para que suenen desde la primera nota
+  useEffect(() => { loadCornetSamples(); }, []);
   useEffect(() => { try { localStorage.setItem('estrella.speed', String(speed)); localStorage.setItem('estrella.noteNames', names ? '1' : '0'); } catch { /* */ } }, [speed, names]);
 
   if (m.error) return <div className="page"><ErrorBox error={m.error} retry={m.reload} /></div>;
@@ -133,10 +135,12 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const review: number[] = score.data?.review_measures ?? [];
 
   const stop = () => { pb.current?.stop(); pb.current = null; setPlaying(false); setNoteId(null); setMeasure(null); };
-  const play = () => {
+  const play = async () => {
     if (!doc) return;
     if (playing) return stop();
     unlockAudio();
+    // si las notas grabadas aún se están descargando, se espera un momento (como mucho 4 s)
+    if (!cornetSamplesReady()) { setPlaying(true); await Promise.race([loadCornetSamples(), new Promise((r) => setTimeout(r, 4000))]); }
     const ns = doc.measures.map((mm) => mm.n);
     pb.current = playScores([{ doc, gain: 1 }], {
       from: Math.min(...ns), to: Math.max(...ns), tempo: Math.round((doc.tempo * speed) / 100), metronome: metro,
