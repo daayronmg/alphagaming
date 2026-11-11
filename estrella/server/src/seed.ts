@@ -53,7 +53,7 @@ const CORNETA_1 = CORNETA_3.map((b) => b.replace(/([A-G])(\d)/g, (_, s, o) => `$
 
 async function ensureStructure() {
   const structure: { name: string; family: string; color: string; instruments: { name: string; clef: string; transposition: number; voices: string[] }[] }[] = [
-    { name: 'Cornetas', family: 'viento', color: '#d4a017', instruments: [{ name: 'Corneta', clef: 'treble', transposition: -2, voices: ['1ª voz', '2ª voz', '3ª voz'] }] },
+    { name: 'Cornetas', family: 'viento', color: '#d4a017', instruments: [{ name: 'Corneta', clef: 'treble', transposition: -1, voices: ['1ª voz', '2ª voz', '3ª voz'] }] },
     { name: 'Trompetas', family: 'viento', color: '#e0662b', instruments: [{ name: 'Trompeta', clef: 'treble', transposition: -2, voices: [] }] },
     { name: 'Trombones', family: 'viento', color: '#b4483c', instruments: [{ name: 'Trombón', clef: 'bass', transposition: 0, voices: [] }] },
     { name: 'Bombardinos', family: 'viento', color: '#8d5a97', instruments: [{ name: 'Bombardino', clef: 'bass', transposition: 0, voices: [] }] },
@@ -130,9 +130,9 @@ export async function seedDemo() {
   await q(`insert into marcha_changes(marcha_id, user_id, summary) values ($1,$2,'Marcha de demostración creada')`, [marcha.id, emilio]);
 
   const partDefs = [
-    { label: 'Corneta 3ª voz', ids: I.c3, bars: CORNETA_3, mps: 4, sys: 4, transposition: -2 },
+    { label: 'Corneta 3ª voz', ids: I.c3, bars: CORNETA_3, mps: 4, sys: 4, transposition: -1 },
     { label: 'Trompeta', ids: I.tp, bars: TROMPETA, mps: 3, sys: 5, transposition: -2 },
-    { label: 'Corneta 1ª voz', ids: I.c1, bars: CORNETA_1, mps: 4, sys: 4, transposition: -2 },
+    { label: 'Corneta 1ª voz', ids: I.c1, bars: CORNETA_1, mps: 4, sys: 4, transposition: -1 },
   ];
   for (const p of partDefs) {
     const doc = score(`Marcha de demostración — ${p.label}`, p.bars, MARKS, p.transposition);

@@ -132,6 +132,8 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const x = m.data;
   const mine = x.mine;
   const doc: ScoreDoc | null = score.data?.published ?? null;
+  // corneta de llaves Do/Reb: debajo de cada nota, la posición (| Do, — Reb)
+  const cornet = /corneta/i.test(published.find((p) => p.id === scoreId)?.label ?? mine.assignment?.instrument ?? '');
   const review: number[] = score.data?.review_measures ?? [];
 
   const stop = () => { pb.current?.stop(); pb.current = null; setPlaying(false); setNoteId(null); setMeasure(null); };
@@ -200,7 +202,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
           )}
         </div>
         <div className="full-score" ref={setBox}>
-          {fitH > 0 && <StaffView doc={doc} colorMode noteNames={names} playingNoteId={noteId} currentMeasure={measure} fitHeight={fitH - 4} />}
+          {fitH > 0 && <StaffView doc={doc} colorMode noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} fitHeight={fitH - 4} />}
         </div>
       </div>
     );
@@ -234,9 +236,10 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
         {mine.status !== 'ok' && mine.assignment && <Notice kind="warn" title="Tu parte no está disponible">{mine.message}</Notice>}
         <div className="row" style={{ gap: 8 }}>{turnHint}<HowTo marcha={x} canEdit={!embedded && can('library.manage')} onSaved={m.reload} /></div>
         <div className="live-score" ref={staffBox}>
-          <StaffView doc={doc} colorMode noteNames={names} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.6 : 1} />
+          <StaffView doc={doc} colorMode noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.6 : 1} />
           <p className="xs faint" style={{ margin: '10px 4px 0' }}>
             <span style={{ color: '#dc2626', fontWeight: 700 }}>Rojo</span>: en línea · <span style={{ color: '#2563eb', fontWeight: 700 }}>Azul</span>: en espacio · Verde: la que suena
+            {cornet && names && <> · <b>|</b> posición de Do · <b>—</b> posición de Reb</>}
             {review.length ? ` · Revisa los compases ${review.slice(0, 6).join(', ')}` : ''}
             {!embedded && ' · ¿No se oye? Sube el volumen y quita el modo silencio.'}
           </p>
@@ -314,7 +317,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
             <p className="xs faint row" style={{ gap: 6, marginBottom: 8 }}><Info size={14} /> Notas leídas del PDF automáticamente.{review.length ? ` Revisa los compases ${review.slice(0, 8).join(', ')}${review.length > 8 ? '…' : ''}: pueden tener algún fallo.` : ''} Ante la duda, manda la partitura original.</p>
           )}
           <p className="xs faint" style={{ marginBottom: 8 }}><span style={{ color: '#dc2626', fontWeight: 700 }}>Rojo</span>: nota en línea · <span style={{ color: '#2563eb', fontWeight: 700 }}>Azul</span>: nota en espacio. La nota que suena se pone verde.</p>
-          <div ref={staffBox}><StaffView doc={doc} colorMode noteNames={names} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.78 : 1} /></div>
+          <div ref={staffBox}><StaffView doc={doc} colorMode noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.78 : 1} /></div>
         </div>
       )}
       {!doc && score.loading && <Spinner />}
