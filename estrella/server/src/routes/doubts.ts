@@ -4,6 +4,7 @@ import multer from 'multer';
 import crypto from 'node:crypto';
 import { q, one, tx } from '../db.ts';
 import { h, parse, HttpError } from '../lib/http.ts';
+import { ownerOf } from '../lib/privacy.ts';
 import { requireAuth, sectionsWith, type AuthUser } from '../lib/auth.ts';
 import { storeFile } from '../lib/files.ts';
 import { config } from '../config.ts';
@@ -58,6 +59,8 @@ doubtsRouter.post('/', multi, h(async (req, res) => {
     text: z.string().min(3).max(2000),
     drawing: z.any().optional(),
   }), JSON.parse(req.body.payload || '{}'));
+  // las marchas privadas no generan dudas para la dirección (y nadie más puede citarlas)
+  if (await ownerOf('part', b.part_id)) throw new HttpError(400, 'Esta marcha es privada: solo la ves tú, así que no admite dudas a la dirección.');
   const part = await one<any>('select marcha_id from parts where id = $1', [b.part_id]);
   if (!part) throw new HttpError(404, 'Partitura no encontrada.');
   const d = await tx(async (c) => {

@@ -58,6 +58,79 @@ function brass(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: n
   o1.connect(f); o2.connect(mix); mix.connect(f); f.connect(g); g.connect(dest);
   o1.start(t); o2.start(t); o1.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
 }
+// ===== Corneta de banda (síntesis) =====
+// No es una grabación: imita lo que hace reconocible a la corneta de Semana Santa — timbre brillante y algo nasal,
+// ataque picado con un pequeño «quiebro» de afinación, brillo que crece con la fuerza, vibrato ancho en las notas
+// largas y el eco de la calle.
+let cornetWave: PeriodicWave | null = null;
+let cornetWaveCtx: AudioContext | null = null;
+function cornetTone(c: AudioContext): PeriodicWave {
+  if (cornetWave && cornetWaveCtx === c) return cornetWave;
+  // armónicos de un metal de tubo cónico estrecho: fundamental firme y mucha energía entre el 2.º y el 6.º
+  const amps = [0, 1, 0.92, 0.84, 0.7, 0.56, 0.44, 0.33, 0.25, 0.18, 0.13, 0.095, 0.07, 0.05, 0.036, 0.026, 0.018, 0.012];
+  const real = new Float32Array(amps.length); const imag = new Float32Array(amps);
+  cornetWaveCtx = c;
+  return (cornetWave = c.createPeriodicWave(real, imag, { disableNormalization: false }));
+}
+let streetVerb: ConvolverNode | null = null;
+let streetVerbCtx: AudioContext | null = null;
+/** Eco corto de calle estrecha: reflexiones tempranas y una cola de algo más de un segundo. */
+function street(c: AudioContext): ConvolverNode {
+  if (streetVerb && streetVerbCtx === c) return streetVerb;
+  const len = Math.floor(c.sampleRate * 1.5);
+  const ir = c.createBuffer(2, len, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    let seed = 1234 + ch * 77; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+    let lp = 0;
+    for (let i = 0; i < len; i++) {
+      const t = i / c.sampleRate;
+      lp += (rnd() - lp) * (0.55 - 0.3 * Math.min(1, t)); // la cola se va apagando en agudos
+      d[i] = lp * Math.exp(-t * 4.6) * (t < 0.012 ? t / 0.012 : 1);
+    }
+    for (const [ms, g] of [[23, 0.5], [41, 0.38], [67, 0.3], [97, 0.2]] as const) d[Math.floor((ms + ch * 3) / 1000 * c.sampleRate)] += g * (ch ? -1 : 1);
+  }
+  const v = c.createConvolver(); v.buffer = ir;
+  const wet = c.createGain(); wet.gain.value = 0.22;
+  v.connect(wet); wet.connect(output(c));
+  streetVerbCtx = c;
+  return (streetVerb = v);
+}
+
+function corneta(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vel = 0.8) {
+  const end = t + dur;
+  const o = c.createOscillator(); o.setPeriodicWave(cornetTone(c));
+  // ataque de lengua: la nota entra un poco baja y sube en seguida
+  o.frequency.setValueAtTime(freq * 0.972, t); o.frequency.exponentialRampToValueAtTime(freq, t + 0.045);
+  // vibrato: aparece en las notas largas y se ensancha
+  if (dur > 0.42) {
+    const lfo = c.createOscillator(); lfo.frequency.value = 5.4;
+    const depth = c.createGain(); depth.gain.setValueAtTime(0, t + 0.2); depth.gain.linearRampToValueAtTime(freq * 0.0085, Math.min(end, t + 0.6));
+    lfo.connect(depth); depth.connect(o.frequency); lfo.start(t); lfo.stop(end + 0.1);
+  }
+  // el brillo sigue a la fuerza: se abre en el ataque y se recoge al sostener
+  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.9;
+  const top = Math.min(11000, freq * (5 + 7 * vel));
+  lp.frequency.setValueAtTime(freq * 2, t); lp.frequency.exponentialRampToValueAtTime(top, t + 0.03); lp.frequency.exponentialRampToValueAtTime(Math.max(freq * 3, top * 0.62), t + Math.min(dur, 0.22));
+  // formantes de la campana: el «canto» nasal y el filo
+  const f1 = c.createBiquadFilter(); f1.type = 'peaking'; f1.frequency.value = 1250; f1.Q.value = 1.1; f1.gain.value = 7;
+  const f2 = c.createBiquadFilter(); f2.type = 'peaking'; f2.frequency.value = 2700; f2.Q.value = 1.4; f2.gain.value = 5;
+  const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = Math.min(260, freq * 0.6);
+  const g = c.createGain();
+  const peak = 0.26 * vel, a = 0.016, rel = Math.min(0.08, dur * 0.3);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak * 1.18, t + a); g.gain.exponentialRampToValueAtTime(peak * 0.86, t + Math.min(dur * 0.5, 0.11));
+  g.gain.setValueAtTime(peak * 0.86, Math.max(t + a, end - rel)); g.gain.linearRampToValueAtTime(0.0001, end);
+  o.connect(lp); lp.connect(f1); f1.connect(f2); f2.connect(hp); hp.connect(g); g.connect(dest); g.connect(street(c));
+  o.start(t); o.stop(end + 0.05);
+  // golpe de aire del picado
+  const n = c.createBufferSource(); const nb = c.createBuffer(1, Math.floor(c.sampleRate * 0.03), c.sampleRate);
+  const nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
+  n.buffer = nb;
+  const nf = c.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = Math.min(4200, freq * 3.2); nf.Q.value = 1.2;
+  const ng = c.createGain(); ng.gain.value = 0.07 * vel;
+  n.connect(nf); nf.connect(ng); ng.connect(dest); n.start(t);
+}
+
 function drum(c: AudioContext, dest: AudioNode, t: number, low = false, vel = 0.8) {
   const len = low ? 0.25 : 0.09;
   const buf = c.createBuffer(1, Math.floor(c.sampleRate * len), c.sampleRate);
@@ -112,7 +185,7 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
   const beatsPerMeasure = doc0.time[0];
   const beatQuarters = 4 / doc0.time[1];
   const secPerQuarter = 60 / opts.tempo / beatQuarters;
-  type Ev = { t: number; dur: number; midi: number | null; perc: boolean; gain: number; id: string };
+  type Ev = { t: number; dur: number; midi: number | null; perc: boolean; gain: number; id: string; cornet: boolean };
   const measureStarts: { n: number; t: number }[] = [];
   const evs: Ev[] = [];
   let lenSec = 0;
@@ -131,7 +204,7 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
         const midi = n.rest || !n.step ? null : midiOf(n.step, n.octave!, n.alter ?? 0) + p.doc.transposition;
         // nota ligada a la anterior de la misma altura: se prolonga, no se vuelve a atacar
         if (tied && midi != null && tied.midi === midi) tied.dur += q * secPerQuarter;
-        else evs.push(tied = { t: t + mt * secPerQuarter, dur: q * secPerQuarter, midi, perc: !!p.perc || p.doc.clef === 'percussion', gain: p.gain, id: n.id });
+        else evs.push(tied = { t: t + mt * secPerQuarter, dur: q * secPerQuarter, midi, perc: !!p.perc || p.doc.clef === 'percussion', gain: p.gain, id: n.id, cornet: p.doc.clef === 'treble' });
         if (!n.tie || midi == null) tied = null;
         mt += q;
       }
@@ -154,7 +227,7 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
     while (idx < evs.length && base + evs[idx].t < horizon) {
       const e = evs[idx++];
       if (e.perc) { if (e.midi != null && e.gain > 0) drum(c, master, base + e.t, e.midi < 64, e.gain); }
-      else if (e.midi != null && e.gain > 0) brass(c, master, midiToFreq(e.midi), base + e.t, Math.max(0.05, e.dur * 0.92), e.gain);
+      else if (e.midi != null && e.gain > 0) (e.cornet ? corneta : brass)(c, master, midiToFreq(e.midi), base + e.t, Math.max(0.05, e.dur * 0.92), e.gain);
       const delay = (base + e.t - c.currentTime) * 1000;
       timers.push(window.setTimeout(() => opts.onNote?.(e.midi != null ? e.id : null), Math.max(0, delay)));
     }

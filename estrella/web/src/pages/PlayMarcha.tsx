@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Play, Square, FileText, ChevronLeft, Info, Wand2, Gauge, Pencil, Maximize, Minimize, RotateCw, Video } from '../components/icons';
-import { get, post, put } from '../lib/api';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Play, Square, FileText, ChevronLeft, Info, Wand2, Gauge, Pencil, Maximize, Minimize, RotateCw, Video, Lock, Trash2 } from '../components/icons';
+import { get, post, put, del } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useLoad, Spinner, ErrorBox, Notice, useToast, Modal, Field } from '../components/ui';
 import StaffView from '../components/StaffView';
@@ -80,6 +80,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const id = marchaId ?? params.id;
   const { can } = useAuth();
   const toast = useToast();
+  const nav = useNavigate();
   const m = useLoad(() => get(`/library/marchas/${id}/play`), [id]);
   // voz que se escucha: la propia; quien no tiene asignación (la dirección) elige entre las publicadas
   const [voice, setVoice] = useState<string | null>(null);
@@ -239,11 +240,13 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
       {!embedded && (
         <div className="row between">
           <Link to="/" className="btn ghost sm"><ChevronLeft size={16} /> Inicio</Link>
-          {can('library.manage') && <Link to={`/marchas/${x.id}`} className="btn ghost sm">Ficha completa</Link>}
+          {can('library.manage') && !x.private && <Link to={`/marchas/${x.id}`} className="btn ghost sm">Ficha completa</Link>}
+          {x.private && <button className="btn ghost sm" onClick={async () => { if (!confirm(`¿Borrar «${x.title}»? Es tuya y solo la ves tú.`)) return; try { await del(`/library/private/marchas/${x.id}`); nav('/'); } catch (e) { toast({ kind: 'error', text: (e as Error).message }); } }}><Trash2 size={15} /> Borrar</button>}
         </div>
       )}
       <div>
         <h1>{x.title}</h1>
+        {x.private && <span className="badge" style={{ marginBottom: 4 }}><Lock size={12} /> Marcha tuya: solo la ves tú</span>}
         <div className="muted">{x.composer || ''}{mine.assignment ? `${x.composer ? ' · ' : ''}Tu parte: ${mine.assignment.instrument}${mine.assignment.voice ? ` ${mine.assignment.voice}` : ''}` : ''}</div>
       </div>
 
@@ -281,7 +284,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
           {x.recordings.length > 0 ? <AudioPlayer tracks={x.recordings} storageKey={x.id} /> : <p className="muted">Esta marcha aún no tiene sonido para tu parte.</p>}
           <div className="row">
             <Link className="btn primary lg" to={`/partitura/${mine.part.id}`}><FileText size={20} /> Ver mi partitura</Link>
-            {can('scores.publish') && <button className="btn lg" disabled={busy} onClick={makeNotes}><Wand2 size={20} /> {busy ? 'Leyendo el PDF…' : 'Sacar las notas del PDF'}</button>}
+            {(can('scores.publish') || x.private) && <button className="btn lg" disabled={busy} onClick={makeNotes}><Wand2 size={20} /> {busy ? 'Leyendo el PDF…' : 'Sacar las notas del PDF'}</button>}
           </div>
         </div>
       ) : null}

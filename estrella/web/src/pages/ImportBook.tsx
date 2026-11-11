@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Upload, CheckCircle2, Trash2, ArrowUpToLine, Wand2 } from '../components/icons';
 import GenerateNotes from '../components/GenerateNotes';
 import { get, upload } from '../lib/api';
@@ -14,8 +14,10 @@ const STATUS: Record<string, string> = { creada: 'Marcha nueva', añadida: 'Part
 
 /** Importa un libreto (un PDF con varias marchas de un instrumento y voz) separando cada marcha. */
 export default function ImportBook() {
-  const { can } = useAuth();
+  const { can, me } = useAuth();
   const toast = useToast();
+  // ?privada=1: marchas propias, que solo ve quien las sube y con su mismo instrumento y voz
+  const priv = useSearchParams()[0].get('privada') === '1';
   const struct = useLoad(() => get<any[]>('/org/structure'), []);
   const marchas = useLoad(() => get<any[]>('/library/marchas'), []);
   const [file, setFile] = useState<File | null>(null);
@@ -30,7 +32,12 @@ export default function ImportBook() {
   const [detected, setDetected] = useState<string | null | undefined>(undefined); // texto de lo leído; null = no encontrado
 
   const instruments = (struct.data ?? []).flatMap((s) => s.instruments);
-  const existing = useMemo(() => new Map((marchas.data ?? []).filter((m) => !m.is_demo).map((m) => [norm(m.title), m])), [marchas.data]);
+  const existing = useMemo(() => new Map((marchas.data ?? []).filter((m) => !m.is_demo && !!m.private === priv).map((m) => [norm(m.title), m])), [marchas.data, priv]);
+  useEffect(() => {
+    if (!priv || !me) return;
+    const a = me.assignments.find((x) => x.is_default) ?? me.assignments[0];
+    if (a) setIv({ instrument_id: a.instrument_id, voice_id: a.voice_id ?? null });
+  }, [priv, me]);
   const autoLabel = (() => {
     const i = instruments.find((x: any) => x.id === iv.instrument_id);
     const v = i?.voices.find((x: any) => x.id === iv.voice_id);
@@ -38,7 +45,7 @@ export default function ImportBook() {
   })();
   const error = file && entries.length ? validateBook(entries, pageCount) : null;
 
-  if (!can('library.manage')) return <div className="page"><Notice kind="danger">Sin permiso.</Notice></div>;
+  if (!(priv ? me?.privateLibrary : can('library.manage'))) return <div className="page"><Notice kind="danger">Sin permiso.</Notice></div>;
 
   const pick = async (f: File | null) => {
     setFile(f); setEntries([]); setDone(null); setPageCount(0); setDetected(undefined);
@@ -51,7 +58,8 @@ export default function ImportBook() {
       // instrumento y voz: los lee la app del PDF (o del nombre del archivo); la dirección solo lo comprueba
       const d = detectInstrument(pages, f.name);
       const inst = d && instruments.find((i: any) => norm(i.name) === norm(d.instrument));
-      if (inst) {
+      if (priv) setDetected(undefined);
+      else if (inst) {
         const voice = d!.voice ? inst.voices.find((v: any) => norm(v.name).startsWith(`${d!.voice}`)) : null;
         setIv({ instrument_id: inst.id, voice_id: voice?.id ?? null });
         setLabel('');
@@ -73,15 +81,16 @@ export default function ImportBook() {
     if (iv.voice_id) fd.append('voice_id', String(iv.voice_id));
     fd.append('entries', JSON.stringify(entries.map((e) => ({ ...e, title: e.title.trim(), composer: e.composer.trim() }))));
     try {
-      const r = await upload<{ results: any[] }>('/library/import-book', fd);
+      const r = await upload<{ results: any[] }>(priv ? '/library/private/import-book' : '/library/import-book', fd);
       setDone(r.results); marchas.reload();
+      if (priv) setNotes(true); // se sacan las notas al momento para poder escucharlas
       toast({ kind: 'ok', text: `${r.results.length} marchas importadas` });
     } catch (e) { toast({ kind: 'error', text: (e as Error).message }); } finally { setBusy(false); }
   };
 
   return (
     <div className="page stack lg">
-      <div className="page-head"><div><div className="eyebrow"><Link to="/biblioteca">Biblioteca</Link></div><h1>Subir marchas</h1></div></div>
+      <div className="page-head"><div><div className="eyebrow">{priv ? <Link to="/">Inicio</Link> : <Link to="/biblioteca">Biblioteca</Link>}</div><h1>{priv ? 'Añadir marchas mías' : 'Subir marchas'}</h1></div></div>
       <Notice kind="info" title="Cómo funciona">
         Sube un PDF con varias marchas de un mismo instrumento y voz (por ejemplo, el libreto de Corneta 3ª). ESTRELLA lee el PDF y averigua{' '}
         <strong>para qué instrumento y voz es</strong>, el título y el autor de cada marcha; <strong>revisa la propuesta antes de importar</strong>. Cada marcha se guarda como un PDF propio. Si la marcha ya existe (mismo título)
@@ -91,10 +100,10 @@ export default function ImportBook() {
         <div className="card stack">
           <Notice kind="ok" title="Importación completada">{done.filter((r) => r.status === 'creada').length} marchas nuevas · {done.filter((r) => r.status === 'añadida').length} partes añadidas · {done.filter((r) => r.status === 'nueva_version').length} nuevas versiones.</Notice>
           <div className="table-wrap"><table className="table"><thead><tr><th>Marcha</th><th>Páginas</th><th>Resultado</th></tr></thead>
-            <tbody>{done.map((r) => <tr key={r.marcha_id}><td><Link to={`/marchas/${r.marcha_id}`}>{r.title}</Link></td><td>{r.pages}</td><td><span className={`badge ${r.status === 'creada' ? 'ok' : 'info'}`}>{STATUS[r.status]}</span></td></tr>)}</tbody></table></div>
+            <tbody>{done.map((r) => <tr key={r.marcha_id}><td><Link to={priv ? `/tocar/${r.marcha_id}` : `/marchas/${r.marcha_id}`}>{r.title}</Link></td><td>{r.pages}</td><td><span className={`badge ${r.status === 'creada' ? 'ok' : 'info'}`}>{STATUS[r.status]}</span></td></tr>)}</tbody></table></div>
           <p className="xs muted">Para que el directo pueda seguir los compases, marca el mapa de compases de cada parte desde su ficha cuando lo necesites.</p>
           <Notice kind="info" title="¿Quieres que se puedan escuchar?">ESTRELLA puede leer las notas de estos PDF para que cada músico pulse «Reproducir» y oiga su parte con el nombre de cada nota.</Notice>
-          <div className="row"><button className="btn primary" onClick={() => setNotes(true)}><Wand2 size={16} /> Sacar las notas ahora</button><Link className="btn" to="/biblioteca">Ir a la biblioteca</Link><button className="btn" onClick={() => { setDone(null); pick(null); }}>Importar otro libreto</button></div>
+          <div className="row"><button className="btn primary" onClick={() => setNotes(true)}><Wand2 size={16} /> Sacar las notas ahora</button><Link className="btn" to={priv ? '/' : '/biblioteca'}>{priv ? 'Ir a mis marchas' : 'Ir a la biblioteca'}</Link><button className="btn" onClick={() => { setDone(null); pick(null); }}>Importar otro libreto</button></div>
         </div>
       ) : (
         <>
@@ -102,8 +111,10 @@ export default function ImportBook() {
             <Field label="Libreto (PDF)"><input className="input" type="file" accept="application/pdf,.pdf" onChange={(e) => pick(e.target.files?.[0] ?? null)} /></Field>
             {detected && <Notice kind="ok" title={`Es para ${detected}`}>Lo ha leído la app del PDF. Si no es así, cámbialo aquí abajo.</Notice>}
             {detected === null && <Notice kind="warn" title="¿Para qué instrumento es?">No lo pone en el PDF ni en el nombre del archivo: elige el instrumento y la voz.</Notice>}
+            {priv ? <Notice kind="ok" title="Solo la verás tú">Estas marchas son privadas: no le aparecen a nadie más, tampoco a la dirección. Se guardan para tu instrumento{autoLabel ? ` (${autoLabel})` : ''}.</Notice> : <>
             <InstrumentVoicePicker value={iv} onChange={setIv} />
             <Field label="Nombre de la parte"><input className="input" value={label} placeholder={autoLabel || 'Corneta 3ª'} onChange={(e) => setLabel(e.target.value)} /></Field>
+            </>}
           </div>
           {reading && <Spinner />}
           {entries.length > 0 && (

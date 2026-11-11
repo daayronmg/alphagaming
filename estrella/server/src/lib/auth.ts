@@ -122,6 +122,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 export const GLOBAL_PERMISSIONS = {
   'scores.publish': 'Editar y publicar partituras oficiales',
   'library.manage': 'Gestionar biblioteca (marchas, archivos, sustituir partituras)',
+  'library.private': 'Añadir marchas privadas (solo las ve quien las sube)',
   'events.manage': 'Crear y modificar eventos y ensayos',
   'annotate.official': 'Anotar en la capa oficial',
   'assignments.manage': 'Modificar asignaciones musicales oficiales y estructura de voces',

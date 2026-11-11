@@ -64,15 +64,15 @@ statsRouter.get('/', h(async (req, res) => {
     from exercise_results where at between $1 and $2 group by 1, 2 order by 1`, [from, to]);
 
   const marchas = await q(`select m.title, count(*)::int as opens, count(distinct u.user_id)::int as people
-    from material_usage u join marchas m on m.id::text = u.ref_id where u.kind = 'marcha' and u.at between $1 and $2 group by m.title order by opens desc limit 15`, [from, to]);
+    from material_usage u join marchas m on m.id::text = u.ref_id where u.kind = 'marcha' and m.owner_id is null and u.at between $1 and $2 group by m.title order by opens desc limit 15`, [from, to]);
 
   const usage = await q(`select kind, count(*)::int as total, count(distinct user_id)::int as people from material_usage where at between $1 and $2 group by kind order by total desc`, [from, to]);
 
-  const passages = await q(`select m.title, pw.measure_from, pw.measure_to, count(distinct pw.event_id)::int as times from passage_work pw join marchas m on m.id = pw.marcha_id
+  const passages = await q(`select m.title, pw.measure_from, pw.measure_to, count(distinct pw.event_id)::int as times from passage_work pw join marchas m on m.id = pw.marcha_id where m.owner_id is null
     group by m.title, pw.measure_from, pw.measure_to having count(distinct pw.event_id) > 1 order by times desc limit 10`);
 
   const doubts = await q(`select m.title, d.measure, d.page, count(*)::int as total from doubts d join marchas m on m.id = d.marcha_id
-    where d.created_at between $1 and $2 group by m.title, d.measure, d.page having count(*) > 1 order by total desc limit 10`, [from, to]);
+    where m.owner_id is null and d.created_at between $1 and $2 group by m.title, d.measure, d.page having count(*) > 1 order by total desc limit 10`, [from, to]);
 
   const sync = await q(`select kind, count(*)::int as total, count(distinct device_id)::int as devices,
       round(avg((detail->>'lateMs')::numeric))::int as avg_late_ms
