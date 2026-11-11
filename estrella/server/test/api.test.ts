@@ -159,6 +159,24 @@ test('marchas privadas: solo las ve su dueño; ni la dirección ni otros compone
   assert.ok(!JSON.stringify((await emilio('/stats')).data).includes('Marcha secreta'));
   // subir con el mismo título una de la banda no toca la privada, y al revés
   assert.equal((await pool.query(`select count(*)::int as n from marchas where title = 'Marcha secreta de A' and owner_id is null`)).rows[0].n, 0);
+  // también vale una foto de la partitura (una sola marcha), y sigue siendo privada
+  const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a5ee0000000049454e44ae426082', 'hex');
+  const fd = new FormData();
+  fd.append('file', new Blob([png], { type: 'image/png' }), 'bulerias.png');
+  fd.append('label', 'x'); fd.append('page_count', '1'); fd.append('instrument_id', '1');
+  fd.append('entries', JSON.stringify([{ title: 'Foto secreta de A', composer: '', from: 1, to: 1 }]));
+  const ph = await fetch(`${base}/library/private/import-book`, { method: 'POST', headers: { cookie: await cookieOf('componente.a@estrella.demo'), 'x-estrella': '1' }, body: fd });
+  assert.equal(ph.status, 200);
+  const phId = (await ph.json()).results[0].marcha_id;
+  const phPart = (await pool.query('select p.page_from, f.kind from parts p join files f on f.id = p.file_id where p.marcha_id = $1', [phId])).rows[0];
+  assert.deepEqual([phPart.kind, phPart.page_from], ['image', null]);
+  assert.equal((await a(`/library/marchas/${phId}/play`)).data.mine.part.file_kind, 'image');
+  assert.equal((await emilio(`/library/marchas/${phId}/play`)).status, 404);
+  // la importación de la banda sigue sin admitir fotos
+  const fd2 = new FormData();
+  fd2.append('file', new Blob([png], { type: 'image/png' }), 'x.png'); fd2.append('label', 'x'); fd2.append('page_count', '1'); fd2.append('instrument_id', '1');
+  fd2.append('entries', JSON.stringify([{ title: 'Foto banda', composer: '', from: 1, to: 1 }]));
+  assert.equal((await fetch(`${base}/library/import-book`, { method: 'POST', headers: { cookie: await cookieOf('emilio@estrella.demo'), 'x-estrella': '1' }, body: fd2 })).status, 415);
   // el dueño la borra
   assert.equal((await a(`/library/private/marchas/${id}`, 'DELETE')).status, 200);
   assert.ok(!(await titles(a)).includes('Marcha secreta de A'));

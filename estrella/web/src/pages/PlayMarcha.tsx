@@ -284,7 +284,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
           {x.recordings.length > 0 ? <AudioPlayer tracks={x.recordings} storageKey={x.id} /> : <p className="muted">Esta marcha aún no tiene sonido para tu parte.</p>}
           <div className="row">
             <Link className="btn primary lg" to={`/partitura/${mine.part.id}`}><FileText size={20} /> Ver mi partitura</Link>
-            {(can('scores.publish') || x.private) && <button className="btn lg" disabled={busy} onClick={makeNotes}><Wand2 size={20} /> {busy ? 'Leyendo el PDF…' : 'Sacar las notas del PDF'}</button>}
+            {(can('scores.publish') || x.private) && mine.part.file_kind !== 'image' && <button className="btn lg" disabled={busy} onClick={makeNotes}><Wand2 size={20} /> {busy ? 'Leyendo el PDF…' : 'Sacar las notas del PDF'}</button>}
           </div>
         </div>
       ) : null}

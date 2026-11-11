@@ -299,7 +299,10 @@ const importBook = (priv: boolean) => h(async (req, res) => {
   const err = validateBook(b.entries, b2.page_count);
   if (err) throw new HttpError(400, err);
   const results = await tx(async (c) => {
-    const f = await storeFile(req.file!.buffer, req.file!.originalname, req.user!.id, ['pdf'], c);
+    // en las privadas también vale una foto de la partitura (una sola marcha)
+    const f = await storeFile(req.file!.buffer, req.file!.originalname, req.user!.id, priv ? ['pdf', 'image'] : ['pdf'], c);
+    const photo = f.kind === 'image';
+    if (photo && b.entries.length !== 1) throw new HttpError(400, 'Una foto es una sola marcha.');
     const out: { marcha_id: string; title: string; status: 'creada' | 'añadida' | 'nueva_version'; pages: number; replaces: string | null }[] = [];
     for (const e of b.entries) {
       let m = await one<any>('select id, composer from marchas where not is_demo and owner_id is not distinct from $2 and unaccent_lower(title) = unaccent_lower($1) order by created_at limit 1', [e.title, ownerId], c);
@@ -313,7 +316,7 @@ const importBook = (priv: boolean) => h(async (req, res) => {
       if (old) { await q('update parts set active = false where id = $1', [old.id], c); if (status !== 'creada') status = 'nueva_version'; }
       await q(`insert into parts(marcha_id, instrument_id, voice_id, label, arrangement, file_id, page_count, page_from, page_to, version, replaces_part_id, created_by)
         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-        [m.id, b.instrument_id, b.voice_id ?? null, b.label, b.arrangement ?? null, f.id, e.to - e.from + 1, e.from, e.to, old ? old.version + 1 : 1, old?.id ?? null, req.user!.id], c);
+        [m.id, b.instrument_id, b.voice_id ?? null, b.label, b.arrangement ?? null, f.id, photo ? 1 : e.to - e.from + 1, photo ? null : e.from, photo ? null : e.to, old ? old.version + 1 : 1, old?.id ?? null, req.user!.id], c);
       await q('insert into marcha_changes(marcha_id, user_id, summary) values ($1,$2,$3)', [m.id, req.user!.id,
         old ? `Partitura «${b.label}» sustituida desde un libreto (versión ${old.version + 1})` : `Partitura «${b.label}» añadida desde un libreto`], c);
       out.push({ marcha_id: m.id, title: e.title, status, pages: e.to - e.from + 1, replaces: old?.id ?? null });
