@@ -230,6 +230,16 @@ export default function ScoreCanvas(props: Props) {
   const [err, setErr] = useState('');
   const wrap = useRef<HTMLDivElement>(null);
   const [avail, setAvail] = useState(800);
+  const [availH, setAvailH] = useState(600);
+  // móvil en horizontal: cada página entera en la pantalla (a lo alto), sin cortar nada
+  const landQuery = '(orientation: landscape) and (max-height: 540px)';
+  const [land, setLand] = useState(() => typeof window !== 'undefined' && window.matchMedia(landQuery).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(landQuery);
+    const on = () => setLand(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
   const canvases = useRef<(HTMLCanvasElement | null)[]>([]);
   const registerCanvas = useRef((i: number, c: HTMLCanvasElement | null) => { canvases.current[i] = c; }).current;
 
@@ -246,14 +256,21 @@ export default function ScoreCanvas(props: Props) {
     const el = wrap.current?.parentElement;
     if (!el) return;
     // el margen del visor se reduce en móvil; se mide al aparecer el contenedor (tras cargar el PDF) y en cada giro
-    const measure = () => { const cs = getComputedStyle(el); setAvail(Math.max(280, el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight))); };
+    const measure = () => {
+      const cs = getComputedStyle(el);
+      setAvail(Math.max(280, el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)));
+      setAvailH(Math.max(160, el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)));
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
   }, [!!pages, err]); // eslint-disable-line
 
-  const width = Math.round(Math.min(avail, 1100) * props.zoom);
+  // en horizontal la página se ajusta a lo alto (la más alta manda) y, si caben, las páginas van una al lado de otra
+  const maxAr = pages?.length ? Math.max(...pages.map((p) => p.height / p.width)) : 1.414;
+  const base = land ? Math.min(avail, Math.floor((availH - 6) / maxAr)) : Math.min(avail, 1100);
+  const width = Math.round(base * props.zoom);
 
   useEffect(() => {
     if (!props.scrollTarget || !wrap.current) return;
@@ -267,7 +284,7 @@ export default function ScoreCanvas(props: Props) {
   if (err) return <Notice kind="danger" title="No se puede mostrar la partitura">{err}. Si estás sin conexión, solo están disponibles las partituras descargadas previamente.</Notice>;
   if (!pages) return <Spinner label="Abriendo partitura…" />;
   return (
-    <div ref={wrap} data-testid="score-canvas">
+    <div ref={wrap} data-testid="score-canvas" className={land ? 'pages-row' : undefined}>
       {pages.map((p, i) => <Page key={i} src={p} index={i} width={width} props={props} registerCanvas={registerCanvas} />)}
     </div>
   );
