@@ -85,7 +85,7 @@ export default function EventDetail() {
         <div className="card">
           <div className="card-title"><h3><Music size={18} /> Repertorio</h3></div>
           {!e.repertoire.length && <p className="small muted">Sin repertorio asignado.</p>}
-          <div className="stack sm">{e.repertoire.map((m: any) => <Link key={m.id} to={`/marchas/${m.id}`} className="list-item" style={{ padding: 8 }}><Music size={16} /><span className="grow">{m.title}</span><span className="badge">Mi parte</span></Link>)}</div>
+          <div className="stack sm">{e.repertoire.map((m: any) => <Link key={m.id} to={`/tocar/${m.id}`} className="list-item" style={{ padding: 8 }}><Music size={16} /><span className="grow">{m.title}</span><span className="badge">Mi parte</span></Link>)}</div>
         </div>
         {e.summary && (
           <div className="card stack sm">

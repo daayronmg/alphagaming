@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
-  Star, FileText, Headphones, FileMusic, Upload, RefreshCw, History, Pencil, AlertTriangle, CheckCircle2, Users, Plus, Eye, Music, ChevronRight, Trash2,
+  Star, FileText, Headphones, FileMusic, Upload, RefreshCw, History, Pencil, AlertTriangle, CheckCircle2, Users, Plus, Eye, Music, ChevronRight, Trash2, Play,
 } from '../components/icons';
 import { get, put, del, upload, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -48,6 +48,7 @@ export default function MarchaDetail() {
             <div className="muted">{x.composer || 'Compositor no indicado'}{x.year ? ` · ${x.year}` : ''}{x.duration_sec ? ` · ${Math.floor(x.duration_sec / 60)}:${String(x.duration_sec % 60).padStart(2, '0')}` : ''}{x.measures ? ` · ${x.measures} compases` : ''}</div>
           </div>
           <div className="row">
+            <Link className="btn primary" to={`/tocar/${x.id}`}><Play size={16} /> Escuchar</Link>
             <button className={`btn icon ${x.favorite ? 'on' : ''}`} onClick={fav} aria-label="Favorita"><Star size={18} fill={x.favorite ? 'currentColor' : 'none'} /></button>
             {manage && <button className="btn" onClick={() => setEditing(true)}><Pencil size={16} /> Editar ficha</button>}
           </div>
