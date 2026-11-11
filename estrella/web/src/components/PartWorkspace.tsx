@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link } from 'react-router-dom';
 import {
   ZoomIn, ZoomOut, Maximize, Minimize, Hand, PenTool, Highlighter, Minus, MoveUpRight, Square, Circle, Type, Stamp, Eraser, MousePointer2,
-  Undo2, Redo2, MessageCircleQuestion, PanelRight, Download, Layers, Hash, AlertTriangle, ScanLine, Play, Pause, Trash2, History, Music, Save,
+  Undo2, Redo2, MessageCircleQuestion, PanelRight, Download, Layers, Hash, AlertTriangle, ScanLine, Play, Pause, Trash2, History, Music, Save, ChevronLeft,
 } from './icons';
 import ScoreCanvas, { type Tool, type Ann, type MeasureBox, type Highlight } from './ScoreCanvas';
 import { useAnnotations } from '../lib/annotations';
@@ -71,7 +71,7 @@ export default function PartWorkspace({ partId, live, header, initialMeasure, in
   const shell = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const [fs, setFs] = useState(false);
-  const [toolsOpen, setToolsOpen] = useState(() => window.innerWidth > 700);
+  const [toolsOpen, setToolsOpen] = useState(() => window.innerWidth > 700 && window.innerHeight > 540);
 
   useEffect(() => { localStorage.setItem('estrella.zoom', String(zoom)); }, [zoom]);
   useEffect(() => { localStorage.setItem('estrella.penonly', penOnly ? '1' : '0'); }, [penOnly]);
@@ -194,6 +194,7 @@ export default function PartWorkspace({ partId, live, header, initialMeasure, in
     <div className="score-shell" ref={shell} style={{ height: height ?? undefined, display: 'flex', flexDirection: 'column' }} data-testid="part-workspace" data-part-id={partId} data-file-id={p.file_id}>
       {header}
       <div className="score-toolbar" role="toolbar" aria-label="Herramientas de partitura">
+        <button className="btn icon sm land-only" onClick={() => history.back()} aria-label="Volver"><ChevronLeft size={16} /></button>
         <button className="btn icon sm" onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.15).toFixed(2)))} aria-label="Alejar"><ZoomOut size={16} /></button>
         <button className="btn sm" style={{ minWidth: 58 }} onClick={() => setZoom(1)} title="Ajustar al ancho">{Math.round(zoom * 100)}%</button>
         <button className="btn icon sm" onClick={() => setZoom((z) => Math.min(3, +(z + 0.15).toFixed(2)))} aria-label="Acercar"><ZoomIn size={16} /></button>
