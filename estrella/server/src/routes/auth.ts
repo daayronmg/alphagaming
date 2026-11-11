@@ -41,6 +41,15 @@ authRouter.post('/login', h(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Cambiar entre modo dirección y modo músico (solo quien tiene el permiso «mode.switch»)
+authRouter.post('/mode', requireAuth, h(async (req, res) => {
+  const { member } = parse(z.object({ member: z.boolean() }), req.body);
+  if (!req.user!.canSwitchMode) throw new HttpError(403, 'No puedes cambiar de modo.');
+  await q('update sessions set acting_member = $2 where id = $1', [req.sessionId, member]);
+  forgetSession(req.sessionId!);
+  res.json({ ok: true, member });
+}));
+
 authRouter.post('/logout', h(async (req, res) => {
   if (req.sessionId) { await q('delete from sessions where id = $1', [req.sessionId]); forgetSession(req.sessionId); }
   res.clearCookie(COOKIE, { path: '/' });
@@ -52,7 +61,7 @@ authRouter.get('/me', h(async (req, res) => {
   const u = await one<any>('select id, name, email, role, permissions, phone, share_contact, joined_at, photo_file_id from users where id = $1', [req.user.id]);
   const prefs = await one<any>('select mute_non_urgent, categories from notification_prefs where user_id = $1', [req.user.id]);
   res.json({
-    user: { ...u, leaderOf: req.user.leaderOf, sectionIds: req.user.sectionIds, assignments: await userAssignments(req.user.id), privateLibrary: (u.permissions ?? []).includes('library.private') },
+    user: { ...u, role: req.user.role, permissions: req.user.permissions, canSwitchMode: !!req.user.canSwitchMode, actingMember: !!req.user.actingMember, leaderOf: req.user.leaderOf, sectionIds: req.user.sectionIds, assignments: await userAssignments(req.user.id), privateLibrary: (u.permissions ?? []).includes('library.private') },
     prefs: prefs ?? { mute_non_urgent: false, categories: { avisos: true, eventos: true, dudas: true, partituras: true } },
     catalog: { global: GLOBAL_PERMISSIONS, section: SECTION_PERMISSIONS },
   });

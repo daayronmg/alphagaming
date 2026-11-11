@@ -9,6 +9,10 @@ export interface Me {
   leaderOf: { section_id: number; permissions: string[] }[]; sectionIds: number[]; assignments: Assignment[];
   /** puede añadir marchas privadas, que solo ve él */
   privateLibrary?: boolean;
+  /** puede cambiar entre modo dirección y modo músico */
+  canSwitchMode?: boolean;
+  /** está en modo músico en este dispositivo */
+  actingMember?: boolean;
   phone: string | null; share_contact: boolean; photo_file_id: string | null;
 }
 export interface Prefs { mute_non_urgent: boolean; categories: Record<string, boolean> }

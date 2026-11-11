@@ -167,6 +167,7 @@ export default function Layout() {
             <span className="ellipsis"><b>{appName}</b><small>{branding.bandName}</small></span>
           </Link>
           <div className="grow hide-mobile" />
+          {me.actingMember && <button className="mode-pill" onClick={() => setMore(true)} title="Estás en modo músico">Modo músico</button>}
           <ConnBadge />
           <button className="btn icon ghost" onClick={toggleTheme} aria-label="Cambiar tema" title="Modo claro/oscuro">{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</button>
         </header>
@@ -183,6 +184,7 @@ export default function Layout() {
       {more && (
         <Modal title={appName} onClose={() => setMore(false)}>
           <div className="stack sm">
+            {me.canSwitchMode && <ModeSwitch member={!!me.actingMember} onDone={() => setMore(false)} />}
             {visible.map((l) => (
               <NavLink key={l.to} to={l.to} end={l.to === '/'} onClick={() => setMore(false)} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>{l.icon}<span>{l.label}</span>{!!l.count && <span className="count">{l.count}</span>}</NavLink>
             ))}
@@ -191,6 +193,24 @@ export default function Layout() {
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+/** Solo para quien tiene el permiso: pasar de dirección a músico (y volver) en este dispositivo. */
+function ModeSwitch({ member, onDone }: { member: boolean; onDone: () => void }) {
+  const { refresh } = useAuth();
+  const nav = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const set = async (m: boolean) => {
+    if (m === member || busy) return;
+    setBusy(true);
+    try { await post('/auth/mode', { member: m }); await refresh(); onDone(); nav('/'); } finally { setBusy(false); }
+  };
+  return (
+    <div className="mode-switch" role="group" aria-label="Modo">
+      <button className={!member ? 'on' : ''} onClick={() => set(false)} disabled={busy}>Dirección</button>
+      <button className={member ? 'on' : ''} onClick={() => set(true)} disabled={busy}>Músico</button>
     </div>
   );
 }

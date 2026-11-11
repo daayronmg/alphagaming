@@ -14,6 +14,10 @@ export interface AuthUser {
   permissions: string[];
   leaderOf: { section_id: number; permissions: string[] }[];
   sectionIds: number[]; // secciones a las que pertenece por sus asignaciones
+  /** puede cambiar entre modo dirección y modo músico (permiso «mode.switch») */
+  canSwitchMode?: boolean;
+  /** esta sesión está en modo músico: se le tratan como a un componente más */
+  actingMember?: boolean;
 }
 
 declare global {
@@ -77,10 +81,15 @@ export async function userFromToken(token: string | undefined): Promise<{ user: 
   const sid = sha256(token);
   const hit = sessionCache.get(sid);
   if (hit && Date.now() - hit.at < SESSION_TTL) return { user: hit.user, sid };
-  const s = await one<any>('select user_id, last_seen_at, expires_at from sessions where id = $1 and expires_at > now()', [sid]);
+  const s = await one<any>('select user_id, last_seen_at, expires_at, acting_member from sessions where id = $1 and expires_at > now()', [sid]);
   if (!s) { sessionCache.delete(sid); return undefined; }
-  const user = await loadUserById(s.user_id);
-  if (!user) return undefined;
+  const real = await loadUserById(s.user_id);
+  if (!real) return undefined;
+  const canSwitchMode = real.permissions.includes('mode.switch');
+  // modo músico: mismo usuario, pero con los permisos de un componente (sin dirección ni responsabilidades)
+  const user: AuthUser = canSwitchMode && s.acting_member
+    ? { ...real, role: 'member', permissions: real.permissions.filter((p) => p === 'library.private' || p === 'mode.switch'), leaderOf: [], canSwitchMode, actingMember: true }
+    : { ...real, canSwitchMode, actingMember: false };
   if (sessionCache.size > 2000) sessionCache.clear();
   sessionCache.set(sid, { at: Date.now(), user, lastSeen: new Date(s.last_seen_at).getTime() });
   if (Date.now() - new Date(s.last_seen_at).getTime() > 5 * 60_000) {
