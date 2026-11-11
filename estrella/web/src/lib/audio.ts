@@ -1,5 +1,5 @@
 // Audio: síntesis de partituras estructuradas, metrónomo preciso y detección de afinación.
-import { midiOf, midiToFreq, noteQuarters, playOrder, type ScoreDoc } from '../../../shared/music';
+import { midiOf, midiToFreq, noteQuarters, playOrder, cornetPosition, type ScoreDoc } from '../../../shared/music';
 
 let ctx: AudioContext | null = null;
 let out: AudioNode | null = null;
@@ -126,39 +126,113 @@ export function loadCornetSamples(): Promise<boolean> {
     ]);
     // se decodifica fuera del contexto principal: no hace falta que el usuario haya tocado nada todavía
     const dec = new OfflineAudioContext(1, 1, 44100);
-    cornetBuf = await new Promise<AudioBuffer>((res, rej) => dec.decodeAudioData(data, res, rej));
-    cornetNotes = meta.notes;
+    const buf = await new Promise<AudioBuffer>((res, rej) => dec.decodeAudioData(data, res, rej));
+    // el MP3 añade unos milisegundos de silencio al principio: se busca dónde empieza de verdad cada nota
+    // (y se salta su pequeño fundido de entrada, la envolvente de cada nota ya lo hace)
+    const d = buf.getChannelData(0), sr = buf.sampleRate;
+    cornetNotes = (meta.notes as CornetSample[]).map((n) => {
+      let i = Math.max(0, Math.floor((n.start - 0.05) * sr));
+      const lim = Math.min(d.length, Math.floor((n.start + 0.2) * sr));
+      while (i < lim && Math.abs(d[i]) < 0.03) i++;
+      const start = i / sr + 0.015;
+      return { ...n, start, dur: n.dur - (start - n.start) };
+    });
+    cornetBuf = buf;
     return true;
   })().catch((e) => { console.warn('[audio] notas de corneta no disponibles', e); cornetLoading = null; return false; });
   return cornetLoading;
 }
 export const cornetSamplesReady = () => !!cornetBuf;
 
-/** Toca la nota con la grabación más cercana, afinada a la altura exacta. Devuelve false si aún no hay grabaciones. */
-function cornetaReal(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vel: number): boolean {
+/** Cómo se enlaza una nota con la anterior y la siguiente (lo que da el fraseo). */
+export interface Phrase {
+  /** frecuencia de la nota anterior cuando va pegada a esta (sin silencio entre medias) */
+  fromFreq?: number | null;
+  /** la anterior estaba en la otra posición de la llave: al pasar se oye el giro */
+  keyTurn?: boolean;
+  /** la siguiente va pegada: esta no se corta, se funde con ella */
+  tieOut?: boolean;
+  /** misma nota repetida: golpe de lengua marcado */
+  retongue?: boolean;
+  /** la siguiente es la misma nota: se deja solo el hueco justo del golpe de lengua */
+  nextSame?: boolean;
+  accent?: boolean;
+  staccato?: boolean;
+}
+
+/** Toca la nota con la grabación más cercana, afinada a la altura exacta, con su fraseo. Devuelve false si aún no hay grabaciones. */
+function cornetaReal(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vel: number, ph: Phrase = {}): boolean {
   if (!cornetBuf || !cornetNotes.length) return false;
   let best = cornetNotes[0];
   for (const n of cornetNotes) if (Math.abs(Math.log(freq / n.f0)) < Math.abs(Math.log(freq / best.f0))) best = n;
   const rate = freq / best.f0;
-  const end = t + dur;
+  const legIn = !!ph.fromFreq && !ph.retongue;
+  // las notas pegadas se solapan un poco para que no haya corte; las picadas se acortan
+  const overlap = ph.tieOut ? 0.045 : 0;
+  const len = ph.staccato ? Math.min(dur, Math.max(0.07, dur * 0.5)) : ph.tieOut ? dur + overlap : ph.nextSame ? Math.max(dur * 0.85, dur - 0.022) : dur * 0.94;
+  const end = t + len;
   const src = c.createBufferSource();
   src.buffer = cornetBuf;
-  src.playbackRate.value = rate;
   // notas más largas que la grabación: se repite la parte central, ya estable
-  if (dur * rate > best.dur - 0.2) { src.loop = true; src.loopStart = best.start + 0.8; src.loopEnd = best.start + best.dur - 0.2; }
+  if (len * rate > best.dur - 0.2) { src.loop = true; src.loopStart = best.start + 0.8; src.loopEnd = best.start + best.dur - 0.2; }
+  const pr = src.playbackRate;
+  if (legIn) {
+    // de una nota a otra sin cortar: la altura resbala; con giro de llave el paso es más lento y se nota
+    const glide = ph.keyTurn ? 0.075 : 0.028;
+    pr.setValueAtTime(rate * (ph.fromFreq! / freq), t);
+    pr.exponentialRampToValueAtTime(rate, t + glide);
+  } else {
+    // ataque con lengua: la nota entra un pelín baja y se asienta
+    pr.setValueAtTime(rate * 0.985, t);
+    pr.exponentialRampToValueAtTime(rate, t + 0.05);
+  }
+  // vibrato en las notas largas: aparece poco a poco, como lo hace el que toca
+  if (len > 0.45) {
+    const lfo = c.createOscillator(); lfo.frequency.value = 5.3;
+    const depth = c.createGain();
+    depth.gain.setValueAtTime(0, t); depth.gain.setValueAtTime(0, t + 0.22);
+    depth.gain.linearRampToValueAtTime(rate * 0.0065, Math.min(end, t + 0.7));
+    lfo.connect(depth); depth.connect(pr); lfo.start(t); lfo.stop(end + 0.05);
+  }
   const g = c.createGain();
-  const peak = 0.6 * vel, a = 0.012, rel = Math.min(0.09, dur * 0.3);
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a);
-  g.gain.setValueAtTime(peak, Math.max(t + a, end - rel)); g.gain.linearRampToValueAtTime(0.0001, end);
+  const peak = 0.6 * vel;
+  const a = legIn ? 0.04 : 0.012; // pegada: entra fundiéndose con la anterior
+  const rel = ph.tieOut ? overlap : ph.staccato ? 0.03 : Math.min(0.12, len * 0.3);
+  g.gain.setValueAtTime(0.0001, t);
+  if (ph.accent) { g.gain.linearRampToValueAtTime(peak * 1.35, t + a); g.gain.exponentialRampToValueAtTime(peak, t + a + 0.12); }
+  else g.gain.linearRampToValueAtTime(peak, t + a);
+  if (ph.keyTurn && legIn) { // el giro de la llave corta un instante el aire
+    g.gain.setValueAtTime(peak, t + a);
+    g.gain.linearRampToValueAtTime(peak * 0.78, t + a + 0.025);
+    g.gain.linearRampToValueAtTime(peak, t + a + 0.07);
+  }
+  // las notas largas se abren y se recogen (dan sentimiento)
+  if (len > 0.9 && !ph.staccato) {
+    const t0 = t + a + (ph.accent ? 0.12 : 0.08);
+    g.gain.setValueAtTime(peak, t0);
+    g.gain.linearRampToValueAtTime(peak * 1.12, t0 + (len - rel - (t0 - t)) * 0.55);
+  }
+  g.gain.setValueAtTime(peak, Math.max(t + a + 0.01, end - rel));
+  g.gain.linearRampToValueAtTime(0.0001, end);
   const wet = c.createGain(); wet.gain.value = 0.35; // la grabación ya trae su sala: solo un poco de eco
   src.connect(g); g.connect(dest); g.connect(wet); wet.connect(street(c));
   src.start(t, best.start); src.stop(end + 0.05);
+  // golpe de lengua: un soplo corto al empezar (más marcado al repetir nota o con acento)
+  if (!legIn) {
+    const n = c.createBufferSource(); const nb = c.createBuffer(1, Math.floor(c.sampleRate * 0.025), c.sampleRate);
+    const nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
+    n.buffer = nb;
+    const nf = c.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = Math.min(4000, freq * 3); nf.Q.value = 1.2;
+    const ng = c.createGain(); ng.gain.value = (ph.retongue || ph.accent ? 0.06 : 0.035) * vel;
+    n.connect(nf); nf.connect(ng); ng.connect(dest); n.start(t);
+  }
   return true;
 }
 
-function corneta(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vel = 0.8) {
+function corneta(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vel = 0.8, ph: Phrase = {}) {
+  if (cornetaReal(c, dest, freq, t, dur, vel, ph)) return;
+  dur = ph.tieOut ? dur : dur * 0.92; // la sintetizada (mientras cargan las grabaciones) deja su pequeño respiro
   const end = t + dur;
-  if (cornetaReal(c, dest, freq, t, dur, vel)) return;
   const o = c.createOscillator(); o.setPeriodicWave(cornetTone(c, freq));
   // ataque de lengua: la nota entra un poco baja y sube en seguida
   o.frequency.setValueAtTime(freq * 0.972, t); o.frequency.exponentialRampToValueAtTime(freq, t + 0.045);
@@ -246,13 +320,20 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
   const beatsPerMeasure = doc0.time[0];
   const beatQuarters = 4 / doc0.time[1];
   const secPerQuarter = 60 / opts.tempo / beatQuarters;
-  type Ev = { t: number; dur: number; midi: number | null; perc: boolean; gain: number; id: string; cornet: boolean };
+  type Ev = {
+    t: number; dur: number; midi: number | null; perc: boolean; gain: number; id: string; cornet: boolean;
+    vel: number; accent: boolean; staccato: boolean; fromMidi?: number | null; keyTurn?: boolean; tieOut?: boolean; retongue?: boolean; nextSame?: boolean;
+  };
+  // matices: cada uno se mantiene hasta el siguiente
+  const DYN: Record<string, number> = { pp: 0.4, p: 0.55, mp: 0.68, mf: 0.8, f: 0.92, ff: 1, sfz: 1 };
   const measureStarts: { n: number; t: number }[] = [];
   const evs: Ev[] = [];
   let lenSec = 0;
   for (const p of parts) {
     let t = 0;
     let tied: Ev | null = null;
+    let level = 0.85;
+    const pev: Ev[] = [];
     // con la obra entera se respetan las repeticiones; con un fragmento se toca tal cual
     const range = p.doc.measures.filter((m) => m.n >= opts.from && m.n <= opts.to);
     const seq = range.length === p.doc.measures.length ? playOrder(range) : range;
@@ -261,11 +342,17 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
       const cap = (p.doc.time[0] * 4) / p.doc.time[1];
       let mt = 0;
       for (const n of m.notes) {
-        const q = noteQuarters(n);
+        const artic = n.artic ?? [];
+        // el calderón alarga la nota
+        const q = noteQuarters(n) * (artic.includes('fermata') ? 1.8 : 1);
         const midi = n.rest || !n.step ? null : midiOf(n.step, n.octave!, n.alter ?? 0) + p.doc.transposition;
+        if (n.dyn && DYN[n.dyn] != null) level = DYN[n.dyn];
         // nota ligada a la anterior de la misma altura: se prolonga, no se vuelve a atacar
         if (tied && midi != null && tied.midi === midi) tied.dur += q * secPerQuarter;
-        else evs.push(tied = { t: t + mt * secPerQuarter, dur: q * secPerQuarter, midi, perc: !!p.perc || p.doc.clef === 'percussion', gain: p.gain, id: n.id, cornet: p.doc.clef === 'treble' });
+        else pev.push(tied = {
+          t: t + mt * secPerQuarter, dur: q * secPerQuarter, midi, perc: !!p.perc || p.doc.clef === 'percussion', gain: p.gain, id: n.id, cornet: p.doc.clef === 'treble',
+          vel: level, accent: artic.includes('accent') || artic.includes('marcato') || n.dyn === 'sfz', staccato: artic.includes('staccato'),
+        });
         if (!n.tie || midi == null) tied = null;
         mt += q;
       }
@@ -273,6 +360,18 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
       t += (mt > 0 ? mt : cap) * secPerQuarter;
     }
     lenSec = Math.max(lenSec, t);
+    // fraseo: notas pegadas (sin silencio entre medias) se enlazan; al cambiar de posición de llave, se oye el giro
+    for (let i = 0; i + 1 < pev.length; i++) {
+      const a = pev[i], b = pev[i + 1];
+      if (a.midi == null || b.midi == null || a.staccato || Math.abs(b.t - (a.t + a.dur)) > 0.005) continue;
+      a.tieOut = b.midi !== a.midi;
+      a.nextSame = b.midi === a.midi;
+      b.fromMidi = a.midi;
+      b.retongue = b.midi === a.midi;
+      const pa = cornetPosition(a.midi), pb = cornetPosition(b.midi);
+      b.keyTurn = !!pa && !!pb && pa !== pb;
+    }
+    evs.push(...pev);
   }
   evs.sort((a, b) => a.t - b.t);
   const clicks: number[] = [];
@@ -288,7 +387,10 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
     while (idx < evs.length && base + evs[idx].t < horizon) {
       const e = evs[idx++];
       if (e.perc) { if (e.midi != null && e.gain > 0) drum(c, master, base + e.t, e.midi < 64, e.gain); }
-      else if (e.midi != null && e.gain > 0) (e.cornet ? corneta : brass)(c, master, midiToFreq(e.midi), base + e.t, Math.max(0.05, e.dur * 0.92), e.gain);
+      else if (e.midi != null && e.gain > 0 && e.cornet) corneta(c, master, midiToFreq(e.midi), base + e.t, Math.max(0.05, e.dur), e.gain * e.vel, {
+        fromFreq: e.fromMidi != null ? midiToFreq(e.fromMidi) : null, keyTurn: e.keyTurn, tieOut: e.tieOut, retongue: e.retongue, nextSame: e.nextSame, accent: e.accent, staccato: e.staccato,
+      });
+      else if (e.midi != null && e.gain > 0) brass(c, master, midiToFreq(e.midi), base + e.t, Math.max(0.05, e.dur * 0.92), e.gain * e.vel);
       const delay = (base + e.t - c.currentTime) * 1000;
       timers.push(window.setTimeout(() => opts.onNote?.(e.midi != null ? e.id : null), Math.max(0, delay)));
     }
