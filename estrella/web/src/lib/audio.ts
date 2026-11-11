@@ -62,15 +62,28 @@ function brass(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: n
 // No es una grabación: imita lo que hace reconocible a la corneta de Semana Santa — timbre brillante y algo nasal,
 // ataque picado con un pequeño «quiebro» de afinación, brillo que crece con la fuerza, vibrato ancho en las notas
 // largas y el eco de la calle.
-let cornetWave: PeriodicWave | null = null;
 let cornetWaveCtx: AudioContext | null = null;
-function cornetTone(c: AudioContext): PeriodicWave {
-  if (cornetWave && cornetWaveCtx === c) return cornetWave;
-  // armónicos de un metal de tubo cónico estrecho: fundamental firme y mucha energía entre el 2.º y el 6.º
-  const amps = [0, 1, 0.92, 0.84, 0.7, 0.56, 0.44, 0.33, 0.25, 0.18, 0.13, 0.095, 0.07, 0.05, 0.036, 0.026, 0.018, 0.012];
-  const real = new Float32Array(amps.length); const imag = new Float32Array(amps);
-  cornetWaveCtx = c;
-  return (cornetWave = c.createPeriodicWave(real, imag, { disableNormalization: false }));
+/**
+ * Timbre de corneta de llaves por registro, medido sobre una corneta real nota a nota (mediana de los
+ * armónicos en cada zona) y algo más brillante para compensar el micrófono del móvil con el que se grabó:
+ * manda la fundamental y los armónicos caen rápido, más aún en el registro medio.
+ */
+const CORNET_AMPS: Record<'grave' | 'medio' | 'agudo', number[]> = {
+  grave: [0, 1, 0.58, 0.3, 0.18, 0.12, 0.09, 0.05, 0.03, 0.03, 0.015, 0.01],
+  medio: [0, 1, 0.3, 0.17, 0.08, 0.04, 0.025, 0.012, 0.008],
+  agudo: [0, 1, 0.45, 0.14, 0.07, 0.035, 0.015, 0.008],
+};
+const cornetWaves = new Map<string, PeriodicWave>();
+function cornetTone(c: AudioContext, freq: number): PeriodicWave {
+  if (cornetWaveCtx !== c) { cornetWaves.clear(); cornetWaveCtx = c; }
+  const reg = freq < 500 ? 'grave' : freq < 1100 ? 'medio' : 'agudo';
+  let w = cornetWaves.get(reg);
+  if (!w) {
+    const amps = CORNET_AMPS[reg];
+    w = c.createPeriodicWave(new Float32Array(amps.length), new Float32Array(amps), { disableNormalization: false });
+    cornetWaves.set(reg, w);
+  }
+  return w;
 }
 let streetVerb: ConvolverNode | null = null;
 let streetVerbCtx: AudioContext | null = null;
@@ -99,7 +112,7 @@ function street(c: AudioContext): ConvolverNode {
 
 function corneta(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vel = 0.8) {
   const end = t + dur;
-  const o = c.createOscillator(); o.setPeriodicWave(cornetTone(c));
+  const o = c.createOscillator(); o.setPeriodicWave(cornetTone(c, freq));
   // ataque de lengua: la nota entra un poco baja y sube en seguida
   o.frequency.setValueAtTime(freq * 0.972, t); o.frequency.exponentialRampToValueAtTime(freq, t + 0.045);
   // vibrato: aparece en las notas largas y se ensancha
@@ -110,11 +123,11 @@ function corneta(c: AudioContext, dest: AudioNode, freq: number, t: number, dur:
   }
   // el brillo sigue a la fuerza: se abre en el ataque y se recoge al sostener
   const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.9;
-  const top = Math.min(11000, freq * (5 + 7 * vel));
+  const top = Math.min(9000, freq * (4 + 5 * vel));
   lp.frequency.setValueAtTime(freq * 2, t); lp.frequency.exponentialRampToValueAtTime(top, t + 0.03); lp.frequency.exponentialRampToValueAtTime(Math.max(freq * 3, top * 0.62), t + Math.min(dur, 0.22));
   // formantes de la campana: el «canto» nasal y el filo
-  const f1 = c.createBiquadFilter(); f1.type = 'peaking'; f1.frequency.value = 1250; f1.Q.value = 1.1; f1.gain.value = 7;
-  const f2 = c.createBiquadFilter(); f2.type = 'peaking'; f2.frequency.value = 2700; f2.Q.value = 1.4; f2.gain.value = 5;
+  const f1 = c.createBiquadFilter(); f1.type = 'peaking'; f1.frequency.value = 1250; f1.Q.value = 1.1; f1.gain.value = 3;
+  const f2 = c.createBiquadFilter(); f2.type = 'peaking'; f2.frequency.value = 2700; f2.Q.value = 1.4; f2.gain.value = 1.5;
   const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = Math.min(260, freq * 0.6);
   const g = c.createGain();
   const peak = 0.26 * vel, a = 0.016, rel = Math.min(0.08, dur * 0.3);
