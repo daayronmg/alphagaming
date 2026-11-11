@@ -203,9 +203,20 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   }
 
   // ensayo en directo: la partitura ocupa la pantalla y los mandos van en una barra fija abajo (a mano del pulgar)
-  if (embedded && doc) {
+  // fuera del ensayo, igual de limpia: la marcha entera para leer y escuchar, sin menús alrededor
+  if (doc) {
     return (
-      <div className="live-play">
+      <div className={embedded ? 'live-play' : 'live-play solo-play'}>
+        {!embedded && (
+          <div className="solo-top">
+            <button className="btn icon ghost" onClick={() => (history.length > 1 ? nav(-1) : nav('/'))} aria-label="Volver"><ChevronLeft size={22} /></button>
+            <div className="grow" />
+            {mine.part && <Link className="btn sm ghost" to={`/partitura/${mine.part.id}`}><FileText size={15} /> Original</Link>}
+            {can('scores.publish') && scoreId && <Link className="btn sm ghost" to={`/score/${scoreId}`}><Pencil size={15} /> Notas</Link>}
+            {can('library.manage') && !x.private && <Link to={`/marchas/${x.id}`} className="btn sm ghost">Ficha</Link>}
+            {x.private && <button className="btn sm ghost" onClick={async () => { if (!confirm(`¿Borrar «${x.title}»? Es tuya y solo la ves tú.`)) return; try { await del(`/library/private/marchas/${x.id}`); nav('/'); } catch (e) { toast({ kind: 'error', text: (e as Error).message }); } }} aria-label="Borrar"><Trash2 size={15} /></button>}
+          </div>
+        )}
         <div className="live-title">
           <h1>{x.title}</h1>
           <div className="small muted ellipsis">{mine.assignment ? `Tu parte: ${mine.assignment.instrument}${mine.assignment.voice ? ` ${mine.assignment.voice}` : ''}` : x.composer || ''}</div>
@@ -215,12 +226,15 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
             {published.map((p) => <option key={p.id} value={p.id}>{p.label}{p.id === mine.score?.id ? ' (la tuya)' : ''}</option>)}
           </select>
         )}
-        <div className="row" style={{ gap: 8 }}>{turnHint}<HowTo marcha={x} canEdit={false} onSaved={m.reload} /></div>
+        {x.private && <span className="badge" style={{ alignSelf: 'flex-start' }}><Lock size={12} /> Marcha tuya: solo la ves tú</span>}
+        {mine.status !== 'ok' && mine.assignment && <Notice kind="warn" title="Tu parte no está disponible">{mine.message}</Notice>}
+        <div className="row" style={{ gap: 8 }}>{turnHint}<HowTo marcha={x} canEdit={!embedded && can('library.manage')} onSaved={m.reload} /></div>
         <div className="live-score" ref={staffBox}>
-          <StaffView doc={doc} colorMode noteNames={names} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.82 : 1} />
+          <StaffView doc={doc} colorMode noteNames={names} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.6 : 1} />
           <p className="xs faint" style={{ margin: '10px 4px 0' }}>
             <span style={{ color: '#dc2626', fontWeight: 700 }}>Rojo</span>: en línea · <span style={{ color: '#2563eb', fontWeight: 700 }}>Azul</span>: en espacio · Verde: la que suena
             {review.length ? ` · Revisa los compases ${review.slice(0, 6).join(', ')}` : ''}
+            {!embedded && ' · ¿No se oye? Sube el volumen y quita el modo silencio.'}
           </p>
         </div>
         <div className="live-dock">
@@ -229,7 +243,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
           </button>
           <button className="btn live-chip-btn" onClick={nextSpeed} aria-label="Velocidad"><Gauge size={16} /> {speed} %</button>
           <button className={`btn live-chip-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>
-          <button className={`btn live-chip-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro}>Metrónomo</button>
+          <button className={`btn live-chip-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">{narrow ? 'Metr.' : 'Metrónomo'}</button>
         </div>
       </div>
     );
