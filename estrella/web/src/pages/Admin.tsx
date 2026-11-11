@@ -4,6 +4,7 @@ import { get, post, put, del, upload } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useLoad, Tabs, Field, useToast, Notice, Spinner } from '../components/ui';
 import { fmtDateTime } from '../lib/format';
+import { InviteLink } from '../components/InviteLink';
 
 export default function Admin() {
   const { me, can } = useAuth();
@@ -115,10 +116,12 @@ function Branding() {
 function Invitations() {
   const l = useLoad(() => get<any[]>('/members/invitations/list'), []);
   return (
+    <div className="stack"><InviteLink />
     <div className="card">
       <div className="table-wrap"><table className="table"><thead><tr><th>Correo</th><th>Rol</th><th>Creada</th><th>Caduca</th><th>Estado</th><th /></tr></thead>
-        <tbody>{(l.data ?? []).map((i) => <tr key={i.code}><td>{i.email ?? '—'}</td><td>{i.role}</td><td className="small">{fmtDateTime(i.created_at)}</td><td className="small">{fmtDateTime(i.expires_at)}</td><td>{i.used_at ? <span className="badge ok">Usada por {i.used_by_name}</span> : new Date(i.expires_at) < new Date() ? <span className="badge">Caducada</span> : <span className="badge warn">Pendiente</span>}</td>
+        <tbody>{(l.data ?? []).map((i) => <tr key={i.code}><td>{i.open ? 'Enlace abierto' : i.email ?? '—'}</td><td>{i.role}</td><td className="small">{fmtDateTime(i.created_at)}</td><td className="small">{fmtDateTime(i.expires_at)}</td><td>{i.open ? <span className={`badge ${new Date(i.expires_at) < new Date() ? '' : 'ok'}`}>{i.uses} alta{i.uses === 1 ? '' : 's'}{new Date(i.expires_at) < new Date() ? ' · caducado' : ''}</span> : i.used_at ? <span className="badge ok">Usada por {i.used_by_name}</span> : new Date(i.expires_at) < new Date() ? <span className="badge">Caducada</span> : <span className="badge warn">Pendiente</span>}</td>
           <td>{!i.used_at && <button className="btn sm ghost" onClick={async () => { await del(`/members/invitations/${i.code}`); l.reload(); }}><Trash2 size={14} /></button>}</td></tr>)}</tbody></table></div>
+    </div>
     </div>
   );
 }

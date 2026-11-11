@@ -86,6 +86,69 @@ export function Register() {
   );
 }
 
+const ICONS: Record<string, string> = { corneta: '📯', trompeta: '🎺', 'trombón': '🎺', trombon: '🎺', bombardino: '🎺', tuba: '🎺', fliscorno: '🎺', caja: '🥁', bombo: '🥁', platos: '🔔' };
+const iconFor = (name: string) => ICONS[name.toLowerCase()] ?? '🎵';
+
+/** Alta con el enlace que comparte la dirección: datos, instrumento y voz. */
+export function Join() {
+  const { code = '' } = useParams();
+  const { refresh, me } = useAuth();
+  const nav = useNavigate();
+  const [inv, setInv] = useState<any>(null);
+  const [loadErr, setLoadErr] = useState('');
+  const [f, setF] = useState({ name: '', phone: '', email: '', password: '', password2: '' });
+  const [ins, setIns] = useState<number | null>(null);
+  const [voice, setVoice] = useState<number | null>(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    get(`/auth/invitation/${encodeURIComponent(code)}`).then((i: any) => { if (!i.open) nav(`/registro?codigo=${encodeURIComponent(code)}`, { replace: true }); else setInv(i); })
+      .catch((e) => setLoadErr((e as Error).message));
+  }, [code]); // eslint-disable-line
+  const instrument = inv?.instruments?.find((i: any) => i.id === ins);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault(); setErr('');
+    if (f.password !== f.password2) return setErr('Las contraseñas no coinciden.');
+    if (!ins) return setErr('Elige tu instrumento.');
+    if (instrument?.voices.length && !voice) return setErr('Elige tu voz.');
+    setBusy(true);
+    try { await post('/auth/join', { code, name: f.name, phone: f.phone, email: f.email, password: f.password, instrument_id: ins, voice_id: voice }); await refresh(); nav('/', { replace: true }); }
+    catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  };
+  if (me) return <Shell><div className="card stack"><h2>Ya tienes la sesión iniciada</h2><p className="muted">Estás dentro como {me.name}.</p><Link className="btn primary lg" to="/">Ir al inicio</Link></div></Shell>;
+  if (loadErr) return <Shell><div className="card stack"><h2>Enlace no válido</h2><Notice kind="danger">{loadErr}</Notice><Link className="btn" to="/login">Ya tengo cuenta</Link></div></Shell>;
+  if (!inv) return <Shell><div className="card"><p className="muted">Cargando…</p></div></Shell>;
+  return (
+    <Shell>
+      <form className="card stack join-form" onSubmit={submit}>
+        <div><h2>Completa tu perfil</h2><p className="muted small">Pon tus datos e indica el instrumento que tocas y estarás listo para empezar.</p></div>
+        <Field label="Nombre y apellidos"><input className="input" autoComplete="name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required /></Field>
+        <Field label="Teléfono" hint="Con él entrarás en la app."><input className="input" type="tel" inputMode="tel" autoComplete="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} required /></Field>
+        <Field label="Correo (opcional)" hint="Para recibir los avisos de ensayos."><input className="input" type="email" autoCapitalize="none" autoComplete="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
+        <Field label="Contraseña" hint="Mínimo 10 caracteres, con letras y números."><input className="input" type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required /></Field>
+        <Field label="Repite la contraseña"><input className="input" type="password" autoComplete="new-password" value={f.password2} onChange={(e) => setF({ ...f, password2: e.target.value })} required /></Field>
+        <div className="join-label">¿Qué tocas?</div>
+        <div className="ins-grid">
+          {inv.instruments.map((i: any) => (
+            <button type="button" key={i.id} className={`ins-card ${ins === i.id ? 'on' : ''}`} aria-pressed={ins === i.id} onClick={() => { setIns(i.id); setVoice(null); }}>
+              <span className="ins-ico" aria-hidden>{iconFor(i.name)}</span><span>{i.name}</span>
+            </button>
+          ))}
+        </div>
+        {instrument && instrument.voices.length > 0 && <>
+          <div className="join-label">¿Qué voz de {instrument.name.toLowerCase()}?</div>
+          <div className="voice-row">
+            {instrument.voices.map((v: any) => <button type="button" key={v.id} className={`voice-chip ${voice === v.id ? 'on' : ''}`} aria-pressed={voice === v.id} onClick={() => setVoice(v.id)}>{v.name}</button>)}
+          </div>
+        </>}
+        {err && <Notice kind="danger">{err}</Notice>}
+        <button className="btn primary lg" disabled={busy}>{busy ? 'Creando tu cuenta…' : 'Hecho'}</button>
+        <Link className="muted small" to="/login">Ya tengo cuenta</Link>
+      </form>
+    </Shell>
+  );
+}
+
 export function Forgot() {
   const [email, setEmail] = useState('');
   const [msg, setMsg] = useState('');

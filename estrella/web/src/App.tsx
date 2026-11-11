@@ -4,7 +4,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useAuth } from './lib/auth';
 import Layout from './components/Layout';
 import { Spinner } from './components/ui';
-import { Login, Register, Forgot, Reset } from './pages/AuthPages';
+import { Login, Register, Join, Forgot, Reset } from './pages/AuthPages';
 import Home from './pages/Home';
 
 const Calendar = lazy(() => import('./pages/Calendar'));
@@ -62,6 +62,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/registro" element={<Register />} />
+          <Route path="/unirse/:code" element={<Join />} />
           <Route path="/recuperar" element={<Forgot />} />
           <Route path="/restablecer/:token" element={<Reset />} />
           <Route element={<Private />}>

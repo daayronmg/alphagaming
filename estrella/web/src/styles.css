@@ -467,3 +467,17 @@ button.march-row { width: 100%; background: none; border: 0; border-bottom: 1px 
 /* lista de marchas al subir un PDF: en móvil las casillas no se aplastan (la tabla se desliza de lado) */
 .table input[aria-label="Título"] { min-width: 190px; }
 .table input[aria-label="Autor"] { min-width: 150px; }
+
+/* Alta con enlace: rejilla de instrumentos */
+.join-label { font-weight: 700; font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; color: var(--muted, #666); margin-top: 6px; }
+.ins-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.ins-card { display: grid; place-items: center; gap: 6px; aspect-ratio: 1 / 1; padding: 8px; border-radius: 16px; border: 1.5px solid var(--line, #ddd); background: var(--surface-2, #f6f5f2); color: inherit; font: inherit; font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .02em; text-align: center; cursor: pointer; }
+.ins-card .ins-ico { font-size: 1.9rem; line-height: 1; }
+.ins-card.on { border-color: var(--accent, #c9a227); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #c9a227) 30%, transparent); background: color-mix(in srgb, var(--accent, #c9a227) 12%, var(--surface-2, #f6f5f2)); }
+.voice-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.invite-link { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.invite-link input { flex: 1 1 220px; min-width: 0; }
+.voice-chip { padding: 12px 18px; border-radius: 999px; border: 1.5px solid var(--line, #ddd); background: var(--surface-2, #f6f5f2); color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+.voice-chip.on { background: #111; border-color: #111; color: #fff; }
+.ins-card.on { background: #111; border-color: #111; color: #fff; box-shadow: none; }
+:root[data-theme='dark'] .voice-chip.on, :root[data-theme='dark'] .ins-card.on { background: #fff; border-color: #fff; color: #111; }
