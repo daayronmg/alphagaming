@@ -572,3 +572,8 @@ button.march-row { width: 100%; background: none; border: 0; border-bottom: 1px 
 .mode-switch button { border: 0; background: transparent; padding: 12px; border-radius: 10px; font: inherit; font-weight: 700; color: var(--text-3); cursor: pointer; }
 .mode-switch button.on { background: var(--surface); color: var(--ok); box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
 .mode-pill { border: 0; border-radius: 999px; padding: 6px 12px; background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); font: inherit; font-weight: 700; font-size: .78rem; cursor: pointer; }
+/* marcha fuera del ensayo: igual que en el ensayo, sin cabecera ni menú abajo */
+.app:has(.solo-play) .topbar, .app:has(.solo-play) .bottom-nav { display: none !important; }
+.solo-play { padding-top: calc(6px + var(--safe-t)); }
+.solo-top { display: flex; align-items: center; gap: 4px; margin: 0 -6px -4px; }
+.solo-play { padding-left: 16px; padding-right: 16px; max-width: 900px; width: 100%; margin: 0 auto; }
