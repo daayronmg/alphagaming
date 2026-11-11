@@ -50,6 +50,12 @@ export default function ImportBook() {
   const pick = async (f: File | null) => {
     setFile(f); setEntries([]); setDone(null); setPageCount(0); setDetected(undefined);
     if (!f) return;
+    // una foto de la partitura: una sola marcha, con el nombre del archivo como título (se puede cambiar)
+    if (priv && f.type.startsWith('image/')) {
+      setPageCount(1);
+      setEntries([{ title: f.name.replace(/\.[a-z0-9]+$/i, '').replace(/[_-]+/g, ' ').trim() || 'Mi marcha', composer: '', from: 1, to: 1 }]);
+      return;
+    }
     setReading(true);
     try {
       const pages = await readPdfText(f);
@@ -83,7 +89,7 @@ export default function ImportBook() {
     try {
       const r = await upload<{ results: any[] }>(priv ? '/library/private/import-book' : '/library/import-book', fd);
       setDone(r.results); marchas.reload();
-      if (priv) setNotes(true); // se sacan las notas al momento para poder escucharlas
+      if (priv && !file.type.startsWith('image/')) setNotes(true); // se sacan las notas al momento para poder escucharlas
       toast({ kind: 'ok', text: `${r.results.length} marchas importadas` });
     } catch (e) { toast({ kind: 'error', text: (e as Error).message }); } finally { setBusy(false); }
   };
@@ -91,11 +97,11 @@ export default function ImportBook() {
   return (
     <div className="page stack lg">
       <div className="page-head"><div><div className="eyebrow">{priv ? <Link to="/">Inicio</Link> : <Link to="/biblioteca">Biblioteca</Link>}</div><h1>{priv ? 'Añadir marchas mías' : 'Subir marchas'}</h1></div></div>
-      <Notice kind="info" title="Cómo funciona">
+      {!priv && <Notice kind="info" title="Cómo funciona">
         Sube un PDF con varias marchas de un mismo instrumento y voz (por ejemplo, el libreto de Corneta 3ª). ESTRELLA lee el PDF y averigua{' '}
         <strong>para qué instrumento y voz es</strong>, el título y el autor de cada marcha; <strong>revisa la propuesta antes de importar</strong>. Cada marcha se guarda como un PDF propio. Si la marcha ya existe (mismo título)
         se le añade esta parte o se publica como nueva versión; si no, se crea. El libreto original no se modifica.
-      </Notice>
+      </Notice>}
       {done ? (
         <div className="card stack">
           <Notice kind="ok" title="Importación completada">{done.filter((r) => r.status === 'creada').length} marchas nuevas · {done.filter((r) => r.status === 'añadida').length} partes añadidas · {done.filter((r) => r.status === 'nueva_version').length} nuevas versiones.</Notice>
@@ -108,7 +114,8 @@ export default function ImportBook() {
       ) : (
         <>
           <div className="card stack">
-            <Field label="Libreto (PDF)"><input className="input" type="file" accept="application/pdf,.pdf" onChange={(e) => pick(e.target.files?.[0] ?? null)} /></Field>
+            <Field label={priv ? 'PDF o foto de la partitura' : 'Libreto (PDF)'}><input className="input" type="file" accept={priv ? 'application/pdf,.pdf,image/jpeg,image/png,image/webp' : 'application/pdf,.pdf'} onChange={(e) => pick(e.target.files?.[0] ?? null)} /></Field>
+            {priv && file?.type.startsWith('image/') && <Notice kind="info" title="Es una foto">Escribe abajo el nombre de la marcha. Podrás verla en la app; para que suene hacen falta sus notas, y de una foto no se pueden leer solas.</Notice>}
             {detected && <Notice kind="ok" title={`Es para ${detected}`}>Lo ha leído la app del PDF. Si no es así, cámbialo aquí abajo.</Notice>}
             {detected === null && <Notice kind="warn" title="¿Para qué instrumento es?">No lo pone en el PDF ni en el nombre del archivo: elige el instrumento y la voz.</Notice>}
             {priv ? <Notice kind="ok" title="Solo la verás tú">Estas marchas son privadas: no le aparecen a nadie más, tampoco a la dirección. Se guardan para tu instrumento{autoLabel ? ` (${autoLabel})` : ''}.</Notice> : <>
