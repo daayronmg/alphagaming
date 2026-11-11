@@ -83,7 +83,7 @@ const cmdSchema = z.discriminatedUnion('type', [
 type Cmd = z.infer<typeof cmdSchema>;
 
 async function marchaInfo(marchaId: string) {
-  const m = await one<any>('select id, title, measures from marchas where id = $1', [marchaId]);
+  const m = await one<any>('select id, title, measures from marchas where id = $1 and owner_id is null', [marchaId]);
   if (!m) throw new HttpError(404, 'Marcha no encontrada.');
   // si hay partitura estructurada publicada, se toman tempo y compás de referencia
   const sc = await one<any>(`select sv.content->'time' as time, (sv.content->>'tempo')::int as tempo, jsonb_array_length(sv.content->'measures') as n

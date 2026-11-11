@@ -52,7 +52,7 @@ authRouter.get('/me', h(async (req, res) => {
   const u = await one<any>('select id, name, email, role, permissions, phone, share_contact, joined_at, photo_file_id from users where id = $1', [req.user.id]);
   const prefs = await one<any>('select mute_non_urgent, categories from notification_prefs where user_id = $1', [req.user.id]);
   res.json({
-    user: { ...u, leaderOf: req.user.leaderOf, sectionIds: req.user.sectionIds, assignments: await userAssignments(req.user.id) },
+    user: { ...u, leaderOf: req.user.leaderOf, sectionIds: req.user.sectionIds, assignments: await userAssignments(req.user.id), privateLibrary: (u.permissions ?? []).includes('library.private') },
     prefs: prefs ?? { mute_non_urgent: false, categories: { avisos: true, eventos: true, dudas: true, partituras: true } },
     catalog: { global: GLOBAL_PERMISSIONS, section: SECTION_PERMISSIONS },
   });

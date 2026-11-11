@@ -105,7 +105,7 @@ membersRouter.get('/:id', h(async (req, res) => {
       from attendance where user_id = $1`, [m.id]);
     out.courses = await q(`select c.title, count(l.id) as lessons, count(p.completed_at) as done from courses c join lessons l on l.course_id = c.id and l.status='publicado'
       left join lesson_progress p on p.lesson_id = l.id and p.user_id = $1 where c.status='publicado' group by c.id order by c.level, c.sort`, [m.id]);
-    out.repertoire = await q(`select distinct ma.id, ma.title from material_usage u join marchas ma on ma.id::text = u.ref_id where u.user_id = $1 and u.kind = 'marcha' limit 50`, [m.id]);
+    out.repertoire = await q(`select distinct ma.id, ma.title from material_usage u join marchas ma on ma.id::text = u.ref_id where u.user_id = $1 and u.kind = 'marcha' and ma.owner_id is null limit 50`, [m.id]);
     out.assignment_changes = await q(`select c.*, r.name as requested_by_name from assignment_changes c left join users r on r.id = c.requested_by where c.user_id = $1 order by c.created_at desc limit 20`, [m.id]);
   }
   if (manage) {

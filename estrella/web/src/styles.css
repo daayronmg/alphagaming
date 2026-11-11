@@ -464,3 +464,6 @@ button.march-row { width: 100%; background: none; border: 0; border-bottom: 1px 
   .score-scroll { padding: 6px; }
 }
 @media (max-width: 699px) { .score-scroll { padding: 8px; } }
+/* lista de marchas al subir un PDF: en móvil las casillas no se aplastan (la tabla se desliza de lado) */
+.table input[aria-label="Título"] { min-width: 190px; }
+.table input[aria-label="Autor"] { min-width: 150px; }

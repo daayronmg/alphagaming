@@ -1,7 +1,7 @@
 import { logoUrl } from '../components/Layout';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, Radio, Music, ChevronRight, Baton, Check, X, Search, Play, MapPin, Clock, CalendarPlus, Upload, BarChart3 } from '../components/icons';
+import { CalendarDays, Radio, Music, ChevronRight, Baton, Check, X, Search, Play, MapPin, Clock, CalendarPlus, Upload, BarChart3, Lock } from '../components/icons';
 import { useAuth } from '../lib/auth';
 import { get, put, post } from '../lib/api';
 import { useLoad, Notice, useToast, Modal, Field } from '../components/ui';
@@ -115,6 +115,7 @@ export default function Home() {
       {/* 3. Elegir una marcha y tocar */}
       <div className="card stack">
         <div className="card-title"><h3><Music size={18} /> Mis marchas</h3><span className="xs faint">{list.length}</span></div>
+        {me.privateLibrary && <Link className="btn sm" style={{ alignSelf: 'flex-start' }} to="/biblioteca/importar?privada=1" data-testid="add-private"><Lock size={15} /> Añadir marcha mía (solo para mí)</Link>}
         <div className="row nowrap"><Search size={18} className="faint" /><input className="input" placeholder="Busca una marcha…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar marcha" /></div>
         {marchas.data && !list.length && <p className="muted small">{q ? 'No hay ninguna marcha con ese nombre.' : 'Todavía no hay marchas. La dirección las sube desde la Biblioteca.'}</p>}
         <div className="march-list">
@@ -122,6 +123,7 @@ export default function Home() {
             <Link key={m.id} to={`/tocar/${m.id}`} className="march-row" data-testid="march-row">
               <span className="play-dot"><Play size={16} /></span>
               <span className="grow"><span className="march-title">{m.title}</span>{m.composer && <span className="xs faint"> · {m.composer}</span>}</span>
+              {m.private && <span className="badge xs" title="Solo la ves tú"><Lock size={11} /> Mía</span>}
               {m.scores > 0 && <span className="badge ok xs" title="Se puede escuchar">♪</span>}
               <ChevronRight size={16} className="faint" />
             </Link>

@@ -64,7 +64,7 @@ export async function importBundledBooks() {
     await tx(async (c) => {
       const f = await storeFile(buf, b.file, owner?.id ?? null, ['pdf'], c);
       for (const e of entries) {
-        let m = await one<any>('select id from marchas where not is_demo and unaccent_lower(title) = unaccent_lower($1) order by created_at limit 1', [e.title], c);
+        let m = await one<any>('select id from marchas where not is_demo and owner_id is null and unaccent_lower(title) = unaccent_lower($1) order by created_at limit 1', [e.title], c);
         if (!m) {
           m = await one<any>('insert into marchas(title, composer, created_by) values ($1,$2,$3) returning id', [e.title, e.composer || null, owner?.id ?? null], c);
           await q('insert into marcha_changes(marcha_id, user_id, summary) values ($1,$2,$3)', [m.id, owner?.id ?? null, 'Marcha creada al cargar el libreto'], c);

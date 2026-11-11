@@ -105,6 +105,65 @@ test('«Cómo se toca»: la dirección guarda el enlace y los músicos lo recibe
   assert.equal((await a(`/library/marchas/${id}/play`)).data.how_url, null);
 });
 
+test('marchas privadas: solo las ve su dueño; ni la dirección ni otros componentes llegan a ellas', async () => {
+  const { emptyScore } = await import('../../shared/music.ts');
+  const a = await login('componente.a@estrella.demo');
+  const b = await login('componente.b@estrella.demo');
+  const emilio = await login('emilio@estrella.demo');
+  const cookieOf = async (email: string) => (await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-estrella': '1' }, body: JSON.stringify({ email, password: DEMO_PASSWORD }) })).headers.get('set-cookie')!.split(';')[0];
+  const upload = async (email: string) => {
+    const fd = new FormData();
+    fd.append('file', new Blob([fs.readFileSync(new URL('../libretos/Corneta 3.pdf', import.meta.url))], { type: 'application/pdf' }), 'mia.pdf');
+    fd.append('label', 'Mi parte'); fd.append('page_count', '50'); fd.append('instrument_id', '2');
+    fd.append('entries', JSON.stringify([{ title: 'Marcha secreta de A', composer: 'Yo', from: 1, to: 1 }]));
+    return fetch(`${base}/library/private/import-book`, { method: 'POST', headers: { cookie: await cookieOf(email), 'x-estrella': '1' }, body: fd });
+  };
+  // sin el permiso no se puede; con él, sí
+  assert.equal((await upload('componente.a@estrella.demo')).status, 403);
+  await pool.query(`update users set permissions = array_append(permissions, 'library.private') where email = 'componente.a@estrella.demo'`);
+  const { forgetUser } = await import('../src/lib/auth.ts');
+  forgetUser((await pool.query(`select id from users where email = 'componente.a@estrella.demo'`)).rows[0].id);
+  const up = await upload('componente.a@estrella.demo');
+  assert.equal(up.status, 200);
+  const id = (await up.json()).results[0].marcha_id;
+  assert.equal((await upload('componente.b@estrella.demo')).status, 403);
+  // se guarda con el instrumento y la voz de A (corneta 3ª), no con lo que diga el formulario
+  const part = (await pool.query('select id, file_id, instrument_id, voice_id from parts where marcha_id = $1', [id])).rows[0];
+  assert.deepEqual([part.instrument_id, part.voice_id], [1, 3]);
+  // listas
+  const titles = async (x: typeof a) => (await x('/library/marchas')).data.map((m: any) => m.title);
+  assert.ok((await titles(a)).includes('Marcha secreta de A'));
+  assert.equal((await a('/library/marchas')).data.find((m: any) => m.id === id).private, true);
+  assert.ok(!(await titles(b)).includes('Marcha secreta de A'));
+  assert.ok(!(await titles(emilio)).includes('Marcha secreta de A'));
+  assert.ok(!(await emilio('/scores/pdf/pending?all=1')).data.some((r: any) => r.marcha_id === id));
+  assert.ok((await a('/scores/pdf/pending')).data.some((r: any) => r.marcha_id === id));
+  // el dueño la abre y saca sus notas
+  assert.equal((await a(`/library/marchas/${id}/play`)).data.private, true);
+  assert.equal((await a(`/files/${part.file_id}`)).status, 200);
+  const pub = await a(`/scores/pdf/${part.id}`, 'POST', { content: emptyScore('x', {}, 4), review: [] });
+  assert.equal(pub.status, 200);
+  assert.equal((await a(`/scores/${pub.data.score_id}?light=1`)).status, 200);
+  // nadie más, por ningún camino
+  for (const who of [emilio, b]) {
+    for (const path of [`/library/marchas/${id}`, `/library/marchas/${id}/play`, `/library/marchas/${id}/my-part`, `/library/parts/${part.id}`, `/files/${part.file_id}`,
+      `/scores/${pub.data.score_id}`, `/scores/${pub.data.score_id}?light=1`, `/annotations?marcha=${id}&part=${part.id}`]) {
+      assert.equal((await who(path)).status, 404, path);
+    }
+    assert.equal((await who(`/scores/pdf/${part.id}`, 'POST', { content: emptyScore('x', {}, 4), review: [] })).status, 404);
+    assert.equal((await who(`/library/private/marchas/${id}`, 'DELETE')).status, 404);
+  }
+  assert.equal((await emilio(`/library/marchas/${id}`, 'PUT', { title: 'Robada' })).status, 404);
+  assert.equal((await emilio(`/library/marchas/${id}`, 'DELETE')).status, 404);
+  // la dirección no puede ponerla en un ensayo en directo, ni aparece en sus estadísticas
+  assert.ok(!JSON.stringify((await emilio('/stats')).data).includes('Marcha secreta'));
+  // subir con el mismo título una de la banda no toca la privada, y al revés
+  assert.equal((await pool.query(`select count(*)::int as n from marchas where title = 'Marcha secreta de A' and owner_id is null`)).rows[0].n, 0);
+  // el dueño la borra
+  assert.equal((await a(`/library/private/marchas/${id}`, 'DELETE')).status, 200);
+  assert.ok(!(await titles(a)).includes('Marcha secreta de A'));
+});
+
 test('asignación automática: cada componente recibe su parte y nunca otra voz', async () => {
   const a = await login('componente.a@estrella.demo');
   const b = await login('componente.b@estrella.demo');

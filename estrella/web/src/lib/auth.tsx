@@ -7,6 +7,8 @@ export interface Assignment { id: number; instrument_id: number; instrument: str
 export interface Me {
   id: string; name: string; email: string; role: 'director' | 'leader' | 'member'; permissions: string[];
   leaderOf: { section_id: number; permissions: string[] }[]; sectionIds: number[]; assignments: Assignment[];
+  /** puede añadir marchas privadas, que solo ve él */
+  privateLibrary?: boolean;
   phone: string | null; share_contact: boolean; photo_file_id: string | null;
 }
 export interface Prefs { mute_non_urgent: boolean; categories: Record<string, boolean> }

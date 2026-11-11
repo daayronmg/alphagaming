@@ -6,6 +6,7 @@ import { h, parse, HttpError } from '../lib/http.ts';
 import { requireAuth, requirePerm } from '../lib/auth.ts';
 import { upload, storeFile } from '../lib/files.ts';
 import { hub } from '../realtime.ts';
+import { privateMarchasChanged } from '../lib/privacy.ts';
 import { sendNewMarchasMail } from '../lib/rsvpMail.ts';
 import { userAssignments, type Assignment } from './members.ts';
 
@@ -67,7 +68,7 @@ export async function resolvePart(userId: string, marchaId: string, opts: { even
 libraryRouter.get('/marchas', h(async (req, res) => {
   const f = req.query as Record<string, string>;
   const params: unknown[] = [req.user!.id];
-  const where: string[] = [];
+  const where: string[] = ['(m.owner_id is null or m.owner_id = $1)']; // las privadas, solo para su dueño
   const add = (sql: string, v: unknown) => { params.push(v); where.push(sql.replaceAll('$?', `$${params.length}`)); };
   if (f.q) add(`(unaccent_lower(m.title) like '%' || unaccent_lower($?) || '%' or unaccent_lower(coalesce(m.composer,'')) like '%' || unaccent_lower($?) || '%')`, f.q);
   if (f.composer) add(`unaccent_lower(coalesce(m.composer,'')) like '%' || unaccent_lower($?) || '%'`, f.composer);
@@ -79,7 +80,7 @@ libraryRouter.get('/marchas', h(async (req, res) => {
   if (f.fav === '1') where.push('fav.user_id is not null');
   if (f.type) add('m.march_type = $?', f.type);
   const rows = await q(`select m.id, m.title, m.composer, m.year, m.duration_sec, m.march_type, m.difficulty, m.measures, m.folder_id, m.is_demo, m.updated_at, m.last_reviewed_at,
-      (fav.user_id is not null) as favorite,
+      (fav.user_id is not null) as favorite, (m.owner_id is not null) as private,
       (select count(*) from parts p where p.marcha_id = m.id and p.active)::int as parts,
       (select count(*) from recordings r where r.marcha_id = m.id)::int as recordings,
       (select count(*) from scores s where s.marcha_id = m.id and s.published_version_id is not null)::int as scores,
@@ -128,7 +129,7 @@ libraryRouter.get('/marchas/:id', h(async (req, res) => {
  */
 libraryRouter.get('/marchas/:id/play', h(async (req, res) => {
   const [m, scores, recordings, mine] = await Promise.all([
-    one<any>('select id, title, composer, is_demo, how_url from marchas where id = $1', [req.params.id]),
+    one<any>('select id, title, composer, is_demo, how_url, (owner_id is not null) as private from marchas where id = $1', [req.params.id]),
     q(`select s.id, s.label, s.instrument_id, s.voice_id, s.published_version_id, (s.draft is not null) as has_draft from scores s
        left join instruments i on i.id = s.instrument_id left join voices v on v.id = s.voice_id where s.marcha_id = $1 order by i.sort, v.sort`, [req.params.id]),
     q(`select r.id, r.file_id, r.label, r.kind from recordings r where r.marcha_id = $1 order by r.created_at`, [req.params.id]),
@@ -267,7 +268,18 @@ libraryRouter.post('/marchas/:id/parts', manage, upload.single('file'), h(async 
  * qué páginas son de cada marcha; el PDF se guarda una sola vez, sin modificarlo, y cada marcha apunta a su
  * tramo de páginas. Se crea la marcha si no existe (se busca por título) y se añade —o se versiona— su partitura.
  */
-libraryRouter.post('/import-book', manage, upload.single('file'), h(async (req, res) => {
+/** `priv`: la marcha queda solo para quien la sube, con su propio instrumento y voz. */
+const importBook = (priv: boolean) => h(async (req, res) => {
+  const ownerId = priv ? req.user!.id : null;
+  if (priv) {
+    if (!req.user!.permissions.includes('library.private')) throw new HttpError(403, 'No tienes activadas las marchas privadas.');
+    const mine = await userAssignments(req.user!.id);
+    const a = mine.find((x) => x.is_default) ?? mine[0];
+    if (!a) throw new HttpError(400, 'Necesitas tener un instrumento asignado para añadir marchas tuyas.');
+    req.body.instrument_id = String(a.instrument_id);
+    if (a.voice_id) req.body.voice_id = String(a.voice_id); else delete req.body.voice_id;
+    req.body.label ||= `${a.instrument}${a.voice ? ` ${a.voice}` : ''}`;
+  }
   if (!req.file) throw new HttpError(400, 'Falta el PDF del libreto.');
   const b = parse(z.object({
     label: z.string().min(1).max(120),
@@ -290,10 +302,10 @@ libraryRouter.post('/import-book', manage, upload.single('file'), h(async (req, 
     const f = await storeFile(req.file!.buffer, req.file!.originalname, req.user!.id, ['pdf'], c);
     const out: { marcha_id: string; title: string; status: 'creada' | 'añadida' | 'nueva_version'; pages: number; replaces: string | null }[] = [];
     for (const e of b.entries) {
-      let m = await one<any>('select id, composer from marchas where not is_demo and unaccent_lower(title) = unaccent_lower($1) order by created_at limit 1', [e.title], c);
+      let m = await one<any>('select id, composer from marchas where not is_demo and owner_id is not distinct from $2 and unaccent_lower(title) = unaccent_lower($1) order by created_at limit 1', [e.title, ownerId], c);
       let status: 'creada' | 'añadida' | 'nueva_version' = 'añadida';
       if (!m) {
-        m = await one<any>('insert into marchas(title, composer, created_by) values ($1,$2,$3) returning id', [e.title, e.composer || null, req.user!.id], c);
+        m = await one<any>('insert into marchas(title, composer, created_by, owner_id) values ($1,$2,$3,$4) returning id', [e.title, e.composer || null, req.user!.id, ownerId], c);
         await q('insert into marcha_changes(marcha_id, user_id, summary) values ($1,$2,$3)', [m.id, req.user!.id, 'Marcha creada al importar un libreto'], c);
         status = 'creada';
       } else if (!m.composer && e.composer) await q('update marchas set composer = $2, updated_at = now() where id = $1', [m.id, e.composer], c);
@@ -306,13 +318,26 @@ libraryRouter.post('/import-book', manage, upload.single('file'), h(async (req, 
         old ? `Partitura «${b.label}» sustituida desde un libreto (versión ${old.version + 1})` : `Partitura «${b.label}» añadida desde un libreto`], c);
       out.push({ marcha_id: m.id, title: e.title, status, pages: e.to - e.from + 1, replaces: old?.id ?? null });
     }
-    await audit(req.user!.id, 'import_book', 'library', null, { file: req.file!.originalname, label: b.label, count: out.length }, c);
+    if (!priv) await audit(req.user!.id, 'import_book', 'library', null, { file: req.file!.originalname, label: b.label, count: out.length }, c);
     return out;
   });
-  for (const r of results) hub.toAll({ t: 'parts:changed', marchaId: r.marcha_id, replaces: r.replaces });
+  if (priv) privateMarchasChanged();
+  for (const r of results) hub.toAll({ t: 'parts:changed', marchaId: r.marcha_id, replaces: r.replaces }, priv ? (c) => c.user.id === ownerId : undefined);
   res.json({ results });
   // por correo, a quienes tocan ese instrumento y voz: las marchas que estrenan parte
-  sendNewMarchasMail(b.instrument_id, b.voice_id ?? null, results.filter((r: any) => r.status !== 'nueva_version').map((r: any) => r.title)).catch((x) => console.error('[correo]', x));
+  if (!priv) sendNewMarchasMail(b.instrument_id, b.voice_id ?? null, results.filter((r: any) => r.status !== 'nueva_version').map((r: any) => r.title)).catch((x) => console.error('[correo]', x));
+});
+libraryRouter.post('/import-book', manage, upload.single('file'), importBook(false));
+// se comprueba el permiso antes de aceptar el archivo
+libraryRouter.post('/private/import-book', (req, res, next) => (req.user!.permissions.includes('library.private') ? next() : res.status(403).json({ error: 'No tienes activadas las marchas privadas.' })), upload.single('file'), importBook(true));
+
+/** El dueño borra una marcha suya (con sus partituras y notas). */
+libraryRouter.delete('/private/marchas/:id', h(async (req, res) => {
+  const m = await one<any>('select owner_id from marchas where id = $1', [req.params.id]);
+  if (!m || m.owner_id !== req.user!.id) throw new HttpError(404, 'Marcha no encontrada.');
+  await q('delete from marchas where id = $1', [req.params.id]);
+  hub.toAll({ t: 'parts:changed', marchaId: req.params.id }, (c) => c.user.id === req.user!.id);
+  res.json({ ok: true });
 }));
 
 libraryRouter.get('/parts/:id', h(async (req, res) => {

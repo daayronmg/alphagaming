@@ -65,24 +65,30 @@ scoresRouter.get('/:id/versions/:vid', h(async (req, res) => {
 // El navegador de la dirección lee cada PDF (vectorial, exportado de Sibelius) y envía la transcripción.
 
 /** Partes en PDF que aún no tienen notas: las que no tienen partitura editable hecha a mano y las de PDF desactualizado. */
-scoresRouter.get('/pdf/pending', publisher, h(async (req, res) => {
+scoresRouter.get('/pdf/pending', h(async (req, res) => {
   const all = req.query.all === '1';
+  // quien publica ve las de la banda y las suyas privadas; quien solo tiene marchas privadas, las suyas
+  const pub = can(req.user, 'scores.publish');
+  if (!pub && !req.user!.permissions.includes('library.private')) throw new HttpError(403, 'No tienes permiso para realizar esta acción.');
   res.json(await q(`select p.id as part_id, p.marcha_id, m.title, p.label, p.instrument_id, p.voice_id, p.file_id, p.page_from, p.page_to, coalesce(i.transposition, 0) as transposition,
       s.id as score_id, s.source
     from parts p join marchas m on m.id = p.marcha_id join files f on f.id = p.file_id left join instruments i on i.id = p.instrument_id
     left join scores s on s.marcha_id = p.marcha_id and s.instrument_id is not distinct from p.instrument_id and s.voice_id is not distinct from p.voice_id
     where p.active and p.instrument_id is not null and f.kind = 'pdf' and not m.is_demo
       and (s.id is null or (s.source = 'pdf' and (s.part_id is distinct from p.id or $1)))
-    order by m.title`, [all]));
+      and (m.owner_id = $2 or ($3 and m.owner_id is null))
+    order by m.title`, [all, req.user!.id, pub]));
 }));
 
 /** Guarda y publica la transcripción de una parte. Nunca sustituye una partitura editable hecha a mano o desde MusicXML. */
-scoresRouter.post('/pdf/:partId', publisher, h(async (req, res) => {
+scoresRouter.post('/pdf/:partId', h(async (req, res) => {
   const b = parse(z.object({ content: z.any(), review: z.array(z.number().int()).max(2000), warnings: z.array(z.string().max(300)).max(50).default([]) }), req.body);
   const err = validateScore(b.content);
   if (err) throw new HttpError(400, `Transcripción no válida: ${err}`);
-  const p = await one<any>(`select p.*, m.title from parts p join marchas m on m.id = p.marcha_id where p.id = $1 and p.active`, [req.params.partId]);
+  const p = await one<any>(`select p.*, m.title, m.owner_id from parts p join marchas m on m.id = p.marcha_id where p.id = $1 and p.active`, [req.params.partId]);
   if (!p || p.instrument_id == null) throw new HttpError(404, 'Partitura no encontrada.');
+  // las de la banda, solo quien publica; una privada, su dueño
+  if (p.owner_id ? p.owner_id !== req.user!.id : !can(req.user, 'scores.publish')) throw new HttpError(403, 'No tienes permiso para realizar esta acción.');
   const existing = await one<any>('select id, source from scores where marcha_id = $1 and instrument_id is not distinct from $2 and voice_id is not distinct from $3',
     [p.marcha_id, p.instrument_id, p.voice_id]);
   if (existing && existing.source !== 'pdf') throw new HttpError(409, 'Esta voz ya tiene una partitura editable hecha por la dirección: no se sustituye.');
