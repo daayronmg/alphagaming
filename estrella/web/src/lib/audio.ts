@@ -160,75 +160,84 @@ export interface Phrase {
   staccato?: boolean;
 }
 
+/** Curvas de fundido a potencia constante: al cruzar dos notas el volumen no baja. */
+const XF_IN = Float32Array.from({ length: 24 }, (_, i) => Math.sin((i / 23) * Math.PI / 2));
+const XF_OUT = Float32Array.from({ length: 24 }, (_, i) => Math.cos((i / 23) * Math.PI / 2));
+const scaled = (curve: Float32Array, k: number, floor = 0.0001) => Float32Array.from(curve, (v) => Math.max(floor, v * k));
+
 /** Toca la nota con la grabación más cercana, afinada a la altura exacta, con su fraseo. Devuelve false si aún no hay grabaciones. */
 function cornetaReal(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vel: number, ph: Phrase = {}): boolean {
   if (!cornetBuf || !cornetNotes.length) return false;
   let best = cornetNotes[0];
   for (const n of cornetNotes) if (Math.abs(Math.log(freq / n.f0)) < Math.abs(Math.log(freq / best.f0))) best = n;
   const rate = freq / best.f0;
+  const XF = 0.06; // cruce entre notas ligadas
   const legIn = !!ph.fromFreq && !ph.retongue;
-  // las notas pegadas se solapan un poco para que no haya corte; las picadas se acortan
-  const overlap = ph.tieOut ? 0.045 : 0;
-  const len = ph.staccato ? Math.min(dur, Math.max(0.07, dur * 0.5)) : ph.tieOut ? dur + overlap : ph.nextSame ? Math.max(dur * 0.85, dur - 0.022) : dur * 0.94;
+  const peak = 0.6 * vel;
+  // duración real de la nota: ligada → hasta que acaba de entrar la siguiente; repetida → hasta el golpe de lengua
+  const len = ph.staccato ? Math.min(dur, Math.max(0.07, dur * 0.5)) : ph.tieOut ? dur + XF : ph.nextSame ? dur + 0.004 : dur * 0.95;
   const end = t + len;
+  // ligada: se arranca de la parte estable de la grabación (sin el golpe de lengua de quien la grabó)
+  const off = legIn ? Math.min(0.32, best.dur * 0.25) : 0;
   const src = c.createBufferSource();
   src.buffer = cornetBuf;
-  // notas más largas que la grabación: se repite la parte central, ya estable
-  if (len * rate > best.dur - 0.2) { src.loop = true; src.loopStart = best.start + 0.8; src.loopEnd = best.start + best.dur - 0.2; }
+  if ((len + 0.05) * rate > best.dur - off - 0.2) { src.loop = true; src.loopStart = best.start + 0.8; src.loopEnd = best.start + best.dur - 0.2; }
   const pr = src.playbackRate;
   if (legIn) {
-    // de una nota a otra sin cortar: la altura resbala; con giro de llave el paso es más lento y se nota
-    const glide = ph.keyTurn ? 0.075 : 0.028;
-    pr.setValueAtTime(rate * (ph.fromFreq! / freq), t);
-    pr.exponentialRampToValueAtTime(rate, t + glide);
+    // la altura resbala de la nota anterior a esta; con giro de llave, más despacio
+    // (el deslizamiento empieza a medio camino: si las dos notas coinciden en altura al cruzarse, se anulan)
+    pr.setValueAtTime(rate * Math.pow(ph.fromFreq! / freq, 0.55), t);
+    pr.exponentialRampToValueAtTime(rate, t + (ph.keyTurn ? 0.055 : 0.025));
   } else {
-    // ataque con lengua: la nota entra un pelín baja y se asienta
-    pr.setValueAtTime(rate * 0.985, t);
-    pr.exponentialRampToValueAtTime(rate, t + 0.05);
+    pr.setValueAtTime(rate * 0.99, t);
+    pr.exponentialRampToValueAtTime(rate, t + 0.04);
   }
-  // vibrato en las notas largas: aparece poco a poco, como lo hace el que toca
-  if (len > 0.45) {
-    const lfo = c.createOscillator(); lfo.frequency.value = 5.3;
+  // vibrato discreto en las notas largas, que aparece poco a poco
+  if (len > 0.5) {
+    const lfo = c.createOscillator(); lfo.frequency.value = 5.2;
     const depth = c.createGain();
-    depth.gain.setValueAtTime(0, t); depth.gain.setValueAtTime(0, t + 0.22);
-    depth.gain.linearRampToValueAtTime(rate * 0.0065, Math.min(end, t + 0.7));
+    depth.gain.setValueAtTime(0, t); depth.gain.setValueAtTime(0, t + 0.3);
+    depth.gain.linearRampToValueAtTime(rate * 0.0042, Math.min(end, t + 0.85));
     lfo.connect(depth); depth.connect(pr); lfo.start(t); lfo.stop(end + 0.05);
   }
-  const g = c.createGain();
-  const peak = 0.6 * vel;
-  const a = legIn ? 0.04 : 0.012; // pegada: entra fundiéndose con la anterior
-  const rel = ph.tieOut ? overlap : ph.staccato ? 0.03 : Math.min(0.12, len * 0.3);
-  g.gain.setValueAtTime(0.0001, t);
-  if (ph.accent) { g.gain.linearRampToValueAtTime(peak * 1.35, t + a); g.gain.exponentialRampToValueAtTime(peak, t + a + 0.12); }
-  else g.gain.linearRampToValueAtTime(peak, t + a);
-  if (ph.keyTurn && legIn) { // el giro de la llave corta un instante el aire
-    g.gain.setValueAtTime(peak, t + a);
-    g.gain.linearRampToValueAtTime(peak * 0.78, t + a + 0.025);
-    g.gain.linearRampToValueAtTime(peak, t + a + 0.07);
+  // envolvente: entrada, cuerpo y salida, sin solapar automatizaciones
+  const env = c.createGain();
+  const g = env.gain;
+  let at: number;
+  if (legIn) { g.setValueCurveAtTime(scaled(XF_IN, peak), t, XF); at = t + XF; }
+  else if (ph.retongue) { // misma nota: entra desde un volumen bajo, sin silencio
+    g.setValueAtTime(peak * 0.3, t); g.linearRampToValueAtTime(peak * (ph.accent ? 1.25 : 1), t + 0.02); at = t + 0.02;
+  } else {
+    g.setValueAtTime(0.0001, t); g.linearRampToValueAtTime(peak * (ph.accent ? 1.3 : 1), t + 0.012); at = t + 0.012;
   }
-  // las notas largas se abren y se recogen (dan sentimiento)
-  if (len > 0.9 && !ph.staccato) {
-    const t0 = t + a + (ph.accent ? 0.12 : 0.08);
-    g.gain.setValueAtTime(peak, t0);
-    g.gain.linearRampToValueAtTime(peak * 1.12, t0 + (len - rel - (t0 - t)) * 0.55);
-  }
-  g.gain.setValueAtTime(peak, Math.max(t + a + 0.01, end - rel));
-  g.gain.linearRampToValueAtTime(0.0001, end);
-  const wet = c.createGain(); wet.gain.value = 0.35; // la grabación ya trae su sala: solo un poco de eco
-  src.connect(g); g.connect(dest); g.connect(wet); wet.connect(street(c));
-  src.start(t, best.start); src.stop(end + 0.05);
-  // golpe de lengua: un soplo corto al empezar (más marcado al repetir nota o con acento)
+  if (ph.accent && !legIn) { g.linearRampToValueAtTime(peak, at + 0.1); at += 0.1; }
+  // salida
+  const outLen = ph.tieOut ? XF : ph.nextSame ? 0.022 : ph.staccato ? 0.03 : Math.min(0.12, len * 0.3);
+  const outStart = Math.max(at + 0.005, end - outLen);
+  // las notas largas crecen un poco y vuelven (sin pasarse)
+  // (antes de una curva no puede haber ningún cambio en su mismo instante: se deja un margen)
+  const bodyEnd = ph.tieOut ? outStart - 0.002 : outStart;
+  if (!ph.staccato && bodyEnd - at > 0.9) {
+    g.linearRampToValueAtTime(peak * 1.06, at + (bodyEnd - at) * 0.6);
+    g.linearRampToValueAtTime(peak, bodyEnd);
+  } else g.setValueAtTime(peak, bodyEnd);
+  if (ph.tieOut) g.setValueCurveAtTime(scaled(XF_OUT, peak), outStart, Math.max(0.01, end - outStart));
+  else if (ph.nextSame) g.linearRampToValueAtTime(peak * 0.3, end); // el golpe de lengua solo baja un poco
+  else g.linearRampToValueAtTime(0.0001, end);
+  const wet = c.createGain(); wet.gain.value = 0.3; // la grabación ya trae su sala: solo un poco de eco
+  src.connect(env); env.connect(dest); env.connect(wet); wet.connect(street(c));
+  src.start(t, best.start + off); src.stop(end + 0.03);
+  // golpe de lengua: un soplo muy corto al empezar frase, al repetir nota o con acento
   if (!legIn) {
-    const n = c.createBufferSource(); const nb = c.createBuffer(1, Math.floor(c.sampleRate * 0.025), c.sampleRate);
+    const n = c.createBufferSource(); const nb = c.createBuffer(1, Math.floor(c.sampleRate * 0.02), c.sampleRate);
     const nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
     n.buffer = nb;
     const nf = c.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = Math.min(4000, freq * 3); nf.Q.value = 1.2;
-    const ng = c.createGain(); ng.gain.value = (ph.retongue || ph.accent ? 0.06 : 0.035) * vel;
+    const ng = c.createGain(); ng.gain.value = (ph.accent ? 0.05 : ph.retongue ? 0.035 : 0.025) * vel;
     n.connect(nf); nf.connect(ng); ng.connect(dest); n.start(t);
   }
   return true;
 }
-
 function corneta(c: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vel = 0.8, ph: Phrase = {}) {
   if (cornetaReal(c, dest, freq, t, dur, vel, ph)) return;
   dur = ph.tieOut ? dur : dur * 0.92; // la sintetizada (mientras cargan las grabaciones) deja su pequeño respiro
