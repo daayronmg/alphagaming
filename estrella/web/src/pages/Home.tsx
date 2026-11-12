@@ -7,6 +7,7 @@ import { get, put, post } from '../lib/api';
 import { useLoad, Notice, useToast, Modal, Field } from '../components/ui';
 import { fmtTime, EVENT_TYPES, assignmentLabel, fmtRelative } from '../lib/format';
 import { useRealtime } from '../lib/realtime';
+import { OfflineDownload } from '../components/OfflineDownload';
 
 const REASONS = ['Trabajo', 'Estoy enfermo/a', 'Estudios', 'Viaje', 'Asunto familiar'];
 
@@ -14,7 +15,8 @@ const REASONS = ['Trabajo', 'Estoy enfermo/a', 'Estudios', 'Viaje', 'Asunto fami
 export default function Home() {
   const { me, can, branding } = useAuth();
   const toast = useToast();
-  const events = useLoad(() => get<any[]>(`/events?from=${new Date(Date.now() - 3 * 3600_000).toISOString()}`), []);
+  // (siempre la misma dirección: así la copia guardada sirve sin conexión; los pasados se filtran aquí)
+  const events = useLoad(() => get<any[]>('/events').then((l) => l.filter((e) => new Date(e.ends_at ?? e.starts_at).getTime() > Date.now() - 3 * 3600_000)), []);
   const live = useLoad(() => get<any[]>('/live/active'), []);
   const marchas = useLoad(() => get<any[]>('/library/marchas'), []);
   const [q, setQ] = useState('');
@@ -115,6 +117,7 @@ export default function Home() {
       {/* 3. Elegir una marcha y tocar */}
       <div className="card stack">
         <div className="card-title"><h3><Music size={18} /> Mis marchas</h3><span className="xs faint">{list.length}</span></div>
+        <OfflineDownload />
         {me.privateLibrary && <Link className="btn sm" style={{ alignSelf: 'flex-start' }} to="/biblioteca/importar?privada=1" data-testid="add-private"><Lock size={15} /> Añadir marcha mía (solo para mí)</Link>}
         <div className="row nowrap"><Search size={18} className="faint" /><input className="input" placeholder="Busca una marcha…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar marcha" /></div>
         {marchas.data && !list.length && <p className="muted small">{q ? 'No hay ninguna marcha con ese nombre.' : 'Todavía no hay marchas. La dirección las sube desde la Biblioteca.'}</p>}

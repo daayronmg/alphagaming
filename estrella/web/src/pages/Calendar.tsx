@@ -5,6 +5,7 @@ import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useLoad, Modal, Field, useToast } from '../components/ui';
 import { useRealtime } from '../lib/realtime';
+import { agendaUrl } from '../lib/offline';
 import { Sheet, SheetOption } from '../components/Sheet';
 import { IcoEnsayo, IcoActuacion, IcoOtro } from '../components/SheetIcons';
 import { EVENT_TYPES, ATT_LABEL, fmtTime, toLocalInput, fromLocalInput } from '../lib/format';
@@ -34,7 +35,7 @@ export default function Calendar() {
   const [preset, setPreset] = useState<{ type: string; title: string } | undefined>();
   const now = new Date();
   // Un año hacia atrás y uno hacia delante: todo lo que la agenda puede enseñar
-  const ev = useLoad(() => get<any[]>(`/events?from=${addDays(now, -366).toISOString()}&to=${addDays(now, 366).toISOString()}`), []);
+  const ev = useLoad(() => get<any[]>(agendaUrl()), []);
   useRealtime((m) => { if (m.t === 'events:changed') ev.reload(); }, []);
   useEffect(() => { if (!creating && sp.get('nuevo')) setSp({}); }, [creating]); // eslint-disable-line
 
