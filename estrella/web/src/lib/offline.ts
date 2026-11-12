@@ -69,3 +69,46 @@ export async function flush(): Promise<{ sent: number; conflicts: string[] }> {
 
 rt.on((m) => { if (m.t === 'reconnected' || m.t === 'welcome') flush(); });
 window.addEventListener('online', () => flush());
+
+/** Agenda: un año atrás y otro adelante, contado desde hoy a las 00:00 (la misma dirección todo el día, así sirve la copia sin conexión). */
+export function agendaUrl(): string {
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  const from = new Date(d); from.setDate(from.getDate() - 366);
+  const to = new Date(d); to.setDate(to.getDate() + 366);
+  return `/events?from=${from.toISOString()}&to=${to.toISOString()}`;
+}
+
+/**
+ * Deja en el móvil todo lo necesario para tocar sin cobertura (procesiones, ensayos sin wifi):
+ * la lista de marchas, la agenda y, de cada marcha, sus datos, las notas de tu voz y el PDF de tu parte.
+ * Lo guarda el propio navegador (service worker), así que después se abre igual sin conexión.
+ */
+export async function downloadForOffline(onProgress: (done: number, total: number) => void): Promise<{ ok: number; total: number }> {
+  const files = new Set<string>();
+  const list = await api<any[]>('/library/marchas');
+  await Promise.all([api(agendaUrl()).catch(() => null), api('/events').catch(() => null), api('/auth/me').catch(() => null), fetch('/sounds/corneta.mp3').catch(() => null)]);
+  let done = 0, ok = 0;
+  const total = list.length;
+  onProgress(0, total);
+  const one = async (m: any) => {
+    try {
+      const d = await api<any>(`/library/marchas/${m.id}/play`);
+      const sid = d.mine?.score?.id ?? (!d.mine?.assignment ? d.scores?.find((s: any) => s.published_version_id)?.id : null);
+      if (sid) await api(`/scores/${sid}?light=1`);
+      const part = d.mine?.part;
+      if (part) {
+        await api(`/library/parts/${part.id}`).catch(() => null);
+        if (!files.has(part.file_id)) { files.add(part.file_id); await fetch(`/api/files/${part.file_id}`, { credentials: 'same-origin' }).then((r) => r.blob()); }
+      }
+      ok++;
+    } catch { /* esa marcha queda sin descargar */ }
+    onProgress(++done, total);
+  };
+  // de 4 en 4 para no saturar el móvil
+  for (let i = 0; i < list.length; i += 4) await Promise.all(list.slice(i, i + 4).map(one));
+  try { localStorage.setItem('estrella.offlineAt', new Date().toISOString()); } catch { /* sin almacenamiento */ }
+  return { ok, total };
+}
+export function offlineSavedAt(): Date | null {
+  try { const v = localStorage.getItem('estrella.offlineAt'); return v ? new Date(v) : null; } catch { return null; }
+}
