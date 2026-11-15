@@ -586,3 +586,5 @@ html.pseudo-full .main { margin: 0 !important; }
 .live-score.is-original { background: transparent; border: 0; padding: 0; overflow: visible; }
 .live-score.is-original .score-page { margin: 0 auto 12px; }
 .live-score.is-original .page-no, .full-score .page-no { display: none; }
+/* el botón de reproducir nunca se aplasta: los demás se desplazan de lado si no caben */
+.live-play-btn { flex: 1 0 auto; min-width: 128px; }

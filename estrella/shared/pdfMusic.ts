@@ -430,3 +430,32 @@ export function transcribe(pages: PageShapes[], opts: { title: string; transposi
   const doc: ScoreDoc = { schema: 1, title: opts.title, clef: 'treble', key: firstKey ?? 0, time: docTime, tempo: tempo || 90, transposition: opts.transposition, measures };
   return { doc, review, notes: measures.reduce((a, m) => a + m.notes.filter((n) => !n.rest).length, 0), warnings };
 }
+
+// ===== Colores sobre el original =====
+
+/** Cabeza de nota en una página (coordenadas 0–1 desde arriba a la izquierda) y si está en línea o en espacio. */
+export interface HeadMark { page: number; x: number; y: number; w: number; h: number; line: boolean }
+
+/**
+ * Dónde está cada cabeza de nota del PDF, para colorearla encima del original sin redibujar nada:
+ * en línea (rojo) o en espacio (azul), igual que en la vista con nombres.
+ */
+export function noteheadMarks(pages: PageShapes[]): HeadMark[] {
+  const out: HeadMark[] = [];
+  pages.forEach((p, pi) => {
+    const staves = findStaves(p, pi + 1);
+    const music = p.glyphs.filter(isMusic);
+    for (const st of staves) {
+      const { s } = st;
+      const headSize = s * 4;
+      const own = music.filter((g) => g.y > st.top - 6 * s && g.y < st.bottom + 6 * s && g.x > st.x0 - 2 && g.x < st.x1 + 2
+        && staves.every((o) => o === st || Math.abs(o.top + o.s * 2 - g.y) >= Math.abs(st.top + 2 * s - g.y)));
+      for (const h of own.filter((g) => HEADS[g.ch] && g.font === 'OpusStd' && g.size > headSize * 0.82)) {
+        const pos = Math.round((st.bottom - h.y) / (s / 2)); // líneas en posiciones pares (también las adicionales)
+        const w = (h.ch === 'w' ? 1.62 : 1.2) * s;
+        out.push({ page: pi + 1, x: (h.x - 0.12 * s) / p.width, y: (h.y - 0.62 * s) / p.height, w: (w + 0.24 * s) / p.width, h: (1.24 * s) / p.height, line: pos % 2 === 0 });
+      }
+    }
+  });
+  return out;
+}

@@ -1,7 +1,7 @@
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { PageText } from '../../../shared/book';
-import type { Transcription } from '../../../shared/pdfMusic';
+import type { Transcription, HeadMark } from '../../../shared/pdfMusic';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -86,17 +86,14 @@ export async function readPdfText(file: File): Promise<PageText[]> {
   return out;
 }
 
-/**
- * Lee las notas de una parte en PDF vectorial (Sibelius) y devuelve la transcripción revisable.
- * Todo ocurre en el navegador: el servidor solo recibe el resultado.
- */
-export async function transcribePdf(source: string | ArrayBuffer, opts: { title: string; transposition: number; range?: [number, number] | null }): Promise<Transcription> {
-  const { shapesFromOperatorList, transcribe } = await import('../../../shared/pdfMusic');
+/** Glifos, trazos y figuras de cada página (lo que leen el transcriptor y los colores sobre el original). */
+async function pdfShapes(source: string | ArrayBuffer, range?: [number, number] | null) {
+  const { shapesFromOperatorList } = await import('../../../shared/pdfMusic');
   const base = { disableFontFace: true, fontExtraProperties: true };
   const doc = await pdfjs.getDocument(typeof source === 'string' ? { ...base, url: source, withCredentials: true } : { ...base, data: new Uint8Array(source) }).promise;
   try {
     const pages = [];
-    const [from, to] = opts.range ?? [1, doc.numPages];
+    const [from, to] = range ?? [1, doc.numPages];
     for (let i = from; i <= Math.min(to, doc.numPages); i++) {
       const page = await doc.getPage(i);
       const ol = await page.getOperatorList();
@@ -111,6 +108,25 @@ export async function transcribePdf(source: string | ArrayBuffer, opts: { title:
       const [x0, y0, x1, y1] = page.view;
       pages.push(shapesFromOperatorList(ol as any, pdfjs.OPS as any, { width: x1 - x0, height: y1 - y0, x0, y0 }, (id) => names.get(id) ?? ''));
     }
-    return transcribe(pages, opts);
+    return pages;
   } finally { await doc.destroy(); }
+}
+
+/**
+ * Lee las notas de una parte en PDF vectorial (Sibelius) y devuelve la transcripción revisable.
+ * Todo ocurre en el navegador: el servidor solo recibe el resultado.
+ */
+export async function transcribePdf(source: string | ArrayBuffer, opts: { title: string; transposition: number; range?: [number, number] | null }): Promise<Transcription> {
+  const { transcribe } = await import('../../../shared/pdfMusic');
+  return transcribe(await pdfShapes(source, opts.range), opts);
+}
+
+const marksCache = new Map<string, Promise<HeadMark[]>>();
+/** Cabezas de nota del PDF (en línea o en espacio), para colorearlas encima del original. */
+export function noteheadMarksFromPdf(url: string, range?: [number, number] | null): Promise<HeadMark[]> {
+  const key = `${url}|${range?.join('-') ?? ''}`;
+  if (!marksCache.has(key)) {
+    marksCache.set(key, (async () => (await import('../../../shared/pdfMusic')).noteheadMarks(await pdfShapes(url, range)))().catch((e) => { marksCache.delete(key); throw e; }));
+  }
+  return marksCache.get(key)!;
 }
