@@ -130,3 +130,13 @@ export function noteheadMarksFromPdf(url: string, range?: [number, number] | nul
   }
   return marksCache.get(key)!;
 }
+
+const headsCache = new Map<string, Promise<Transcription>>();
+/** Notas del PDF original con la posición de cada cabeza: para rotular y seguir la música encima del original. */
+export function noteHeadsFromPdf(url: string, range?: [number, number] | null): Promise<Transcription> {
+  const key = `${url}|${range?.join('-') ?? ''}`;
+  if (!headsCache.has(key)) {
+    headsCache.set(key, (async () => (await import('../../../shared/pdfMusic')).transcribe(await pdfShapes(url, range), { title: '', transposition: 0 }))().catch((e) => { headsCache.delete(key); throw e; }));
+  }
+  return headsCache.get(key)!;
+}
