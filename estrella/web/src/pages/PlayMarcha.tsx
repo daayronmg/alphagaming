@@ -10,7 +10,7 @@ import { toggleFullscreen, isFullscreen, onFullscreen } from '../lib/fullscreen'
 import { fileUrl } from '../lib/api';
 import AudioPlayer from '../components/AudioPlayer';
 import { playScores, unlockAudio, loadCornetSamples, cornetSamplesReady, type ScorePlayback } from '../lib/audio';
-import { transcribePdf } from '../lib/pdf';
+import { transcribePdf, noteheadMarksFromPdf } from '../lib/pdf';
 import { useRealtime } from '../lib/realtime';
 import type { ScoreDoc } from '../../../shared/music';
 
@@ -97,6 +97,13 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   // por defecto se ve el original tal cual; la versión redibujada (con nombres de notas) solo si se pide
   const [view, setView] = useState<'original' | 'notas'>(() => { try { return localStorage.getItem('estrella.view') === 'notas' ? 'notas' : 'original'; } catch { return 'original'; } });
   useEffect(() => { try { localStorage.setItem('estrella.view', view); } catch { /* */ } }, [view]);
+  // colores de las notas (en línea rojo, en espacio azul): de serie sí; se pueden quitar
+  const [colors, setColors] = useState(() => { try { return localStorage.getItem('estrella.colors') !== '0'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('estrella.colors', colors ? '1' : '0'); } catch { /* */ } }, [colors]);
+  const partFile = m.data?.mine?.part as any;
+  const marks = useLoad(() => (partFile && partFile.file_kind !== 'image'
+    ? noteheadMarksFromPdf(`/api/files/${partFile.file_id}`, partFile.page_from ? [partFile.page_from, partFile.page_to] : null).catch(() => null)
+    : Promise.resolve(null)), [partFile?.id]);
   const [playing, setPlaying] = useState(false);
   const [noteId, setNoteId] = useState<string | null>(null);
   const [measure, setMeasure] = useState<number | null>(null);
@@ -149,7 +156,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const original = mine.part && (
     <ScoreCanvas url={fileUrl(mine.part.file_id)} range={mine.part.page_from ? [mine.part.page_from, mine.part.page_to] : null}
       kind={mine.part.file_kind === 'image' ? 'image' : 'pdf'} zoom={1} tool="none" color="#000" width={3} symbol=""
-      annotations={[]} measureMap={map} highlights={curBox ? [{ ...curBox, variant: 'current' }] : []} />
+      annotations={[]} measureMap={map} highlights={curBox ? [{ ...curBox, variant: 'current' }] : []} tint={colors ? marks.data ?? null : null} />
   );
 
   const stop = () => { pb.current?.stop(); pb.current = null; setPlaying(false); setNoteId(null); setMeasure(null); };
@@ -197,9 +204,12 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
       {full ? <Minimize size={size} /> : <Maximize size={size} />}
     </button>
   );
+  const colorBtn = (cls: string) => (
+    <button className={`${cls} ${colors ? 'primary' : ''}`} onClick={() => setColors(!colors)} aria-pressed={colors} data-testid="colors-toggle">Colores</button>
+  );
   // cambiar entre el original y la versión con nombres de notas
   const viewBtn = (cls: string) => mine.part && (!voice || scoreId === mine.score?.id) && (
-    <button className={cls} onClick={() => setView(view === 'original' ? 'notas' : 'original')} data-testid="view-toggle">{view === 'original' ? 'Con nombres' : 'Original'}</button>
+    <button className={cls} onClick={() => setView(view === 'original' ? 'notas' : 'original')} data-testid="view-toggle">{view === 'original' ? (narrow ? 'Nombres' : 'Con nombres') : 'Original'}</button>
   );
   const turnHint = phone && !land && doc && (
     <button className="btn sm turn-hint" onClick={goFull}><RotateCw size={15} /> Gira el móvil para ver la marcha completa</button>
@@ -221,13 +231,14 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
             {playing ? <><Square size={16} /> Parar</> : <><Play size={16} /> Reproducir</>}
           </button>
           <button className="btn full-btn" onClick={nextSpeed} aria-label="Velocidad">{speed} %</button>
+          {colorBtn('btn full-btn')}
           {viewBtn('btn full-btn')}
           {!showOriginal && <button className={`btn full-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>}
           <button className={`btn full-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">Metr.</button>
           {fullBtn('btn icon ghost', 18)}
         </div>
         <div className="full-score" ref={setBox}>
-          {showOriginal ? original : fitH > 0 && <StaffView doc={doc} colorMode noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} fitHeight={fitH - 4} />}
+          {showOriginal ? original : fitH > 0 && <StaffView doc={doc} colorMode={colors} noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} fitHeight={fitH - 4} />}
         </div>
       </div>
     );
@@ -262,7 +273,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
         {mine.status !== 'ok' && mine.assignment && <Notice kind="warn" title="Tu parte no está disponible">{mine.message}</Notice>}
         <div className="row" style={{ gap: 8 }}>{turnHint}<HowTo marcha={x} canEdit={!embedded && can('library.manage')} onSaved={m.reload} /></div>
         <div className={`live-score ${showOriginal ? 'is-original' : ''}`} ref={staffBox}>
-          {showOriginal ? original : <StaffView doc={doc} colorMode noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.6 : 1} />}
+          {showOriginal ? original : <StaffView doc={doc} colorMode={colors} noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.6 : 1} />}
           {!showOriginal && <p className="xs faint" style={{ margin: '10px 4px 0' }}>
             <span style={{ color: '#dc2626', fontWeight: 700 }}>Rojo</span>: en línea · <span style={{ color: '#2563eb', fontWeight: 700 }}>Azul</span>: en espacio · Verde: la que suena
             {cornet && names && <> · <b>|</b> posición de Do · <b>—</b> posición de Reb</>}
@@ -275,6 +286,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
             {playing ? <><Square size={20} /> Parar</> : <><Play size={22} /> Reproducir</>}
           </button>
           <button className="btn live-chip-btn" onClick={nextSpeed} aria-label="Velocidad"><Gauge size={16} /> {speed} %</button>
+          {colorBtn('btn live-chip-btn')}
           {viewBtn('btn live-chip-btn')}
           {!showOriginal && <button className={`btn live-chip-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>}
           <button className={`btn live-chip-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">{narrow ? 'Metr.' : 'Metrónomo'}</button>
@@ -345,7 +357,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
             <p className="xs faint row" style={{ gap: 6, marginBottom: 8 }}><Info size={14} /> Notas leídas del PDF automáticamente.{review.length ? ` Revisa los compases ${review.slice(0, 8).join(', ')}${review.length > 8 ? '…' : ''}: pueden tener algún fallo.` : ''} Ante la duda, manda la partitura original.</p>
           )}
           <p className="xs faint" style={{ marginBottom: 8 }}><span style={{ color: '#dc2626', fontWeight: 700 }}>Rojo</span>: nota en línea · <span style={{ color: '#2563eb', fontWeight: 700 }}>Azul</span>: nota en espacio. La nota que suena se pone verde.</p>
-          <div ref={staffBox}><StaffView doc={doc} colorMode noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.78 : 1} /></div>
+          <div ref={staffBox}><StaffView doc={doc} colorMode={colors} noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.78 : 1} /></div>
         </div>
       )}
       {!doc && score.loading && <Spinner />}

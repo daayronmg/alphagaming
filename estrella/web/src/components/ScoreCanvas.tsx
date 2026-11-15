@@ -1,4 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPE } from 'react';
+import type { HeadMark } from '../../../shared/pdfMusic';
 import { loadPages, type PageSource } from '../lib/pdf';
 import { Spinner, Notice } from './ui';
 
@@ -32,6 +33,8 @@ interface Props {
   scrollTarget?: { page: number; y: number; key: number } | null;
   onPages?: (n: number) => void;
   penOnly?: boolean;
+  /** cabezas de nota a colorear (en línea → rojo, en espacio → azul); null = original sin tocar */
+  tint?: HeadMark[] | null;
 }
 
 const U = 1000; // unidades SVG del ancho de página
@@ -105,6 +108,27 @@ function TextBox({ x, y, text, color, size, anchorBottom }: { x: number; y: numb
   );
 }
 
+const TINT_LINE = [220, 38, 38]; // rojo: nota en línea
+const TINT_SPACE = [37, 99, 235]; // azul: nota en espacio
+function tintHeads(cv: HTMLCanvasElement, marks: HeadMark[]) {
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return;
+  for (const m of marks) {
+    const x = Math.max(0, Math.floor(m.x * cv.width)), y = Math.max(0, Math.floor(m.y * cv.height));
+    const w = Math.min(cv.width - x, Math.ceil(m.w * cv.width)), h = Math.min(cv.height - y, Math.ceil(m.h * cv.height));
+    if (w <= 0 || h <= 0) continue;
+    const img = ctx.getImageData(x, y, w, h); const d = img.data;
+    const [r, g, b] = m.line ? TINT_LINE : TINT_SPACE;
+    for (let i = 0; i < d.length; i += 4) {
+      const lum = (d[i] + d[i + 1] + d[i + 2]) / 3;
+      if (lum > 215) continue; // fondo y bordes muy claros, tal cual
+      const t = 1 - lum / 255; // cuánto «negro» tenía el píxel
+      d[i] = Math.round(r * t + 255 * (1 - t)); d[i + 1] = Math.round(g * t + 255 * (1 - t)); d[i + 2] = Math.round(b * t + 255 * (1 - t));
+    }
+    ctx.putImageData(img, x, y);
+  }
+}
+
 function Page({ src, index, width, props, registerCanvas }: { src: PageSource; index: number; width: number; props: Props; registerCanvas: (i: number, c: HTMLCanvasElement | null) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -117,7 +141,17 @@ function Page({ src, index, width, props, registerCanvas }: { src: PageSource; i
   const lastSend = useRef(0);
   const pointerType = useRef<string>('');
 
-  useEffect(() => { if (canvasRef.current && width > 0) src.render(canvasRef.current, width); }, [src, width]);
+  // dibuja la página y, si se piden colores, tiñe solo los píxeles oscuros de cada cabeza de nota
+  // (la forma es la del original: una blanca sigue hueca; nada se mueve ni se añade)
+  const tint = props.tint?.filter((t) => t.page === page) ?? null;
+  const tintKey = tint ? tint.length : -1;
+  useEffect(() => {
+    const cv = canvasRef.current;
+    if (!cv || width <= 0) return;
+    let off = false;
+    src.render(cv, width).then(() => { if (!off && tint?.length) tintHeads(cv, tint); }).catch(() => {});
+    return () => { off = true; };
+  }, [src, width, tintKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { registerCanvas(index, canvasRef.current); return () => registerCanvas(index, null); }, [index, registerCanvas]);
 
   const norm = (e: RPE): [number, number] => {
