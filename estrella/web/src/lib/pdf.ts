@@ -131,12 +131,50 @@ export function noteheadMarksFromPdf(url: string, range?: [number, number] | nul
   return marksCache.get(key)!;
 }
 
-const headsCache = new Map<string, Promise<Transcription>>();
-/** Notas del PDF original con la posición de cada cabeza: para rotular y seguir la música encima del original. */
-export function noteHeadsFromPdf(url: string, range?: [number, number] | null): Promise<Transcription> {
-  const key = `${url}|${range?.join('-') ?? ''}`;
+export type HeadSource = Transcription & { approx?: boolean };
+const headsCache = new Map<string, Promise<HeadSource>>();
+/**
+ * Notas del original con la posición de cada cabeza: para colorear, rotular y seguir la música encima.
+ * PDF de Sibelius → se leen tal cual; foto o escaneo (o PDF que solo lleva una foto) → se buscan en la imagen.
+ */
+export function noteHeadsFromPdf(url: string, range?: [number, number] | null, kind: 'pdf' | 'image' = 'pdf'): Promise<HeadSource> {
+  const key = `${kind}|${url}|${range?.join('-') ?? ''}`;
   if (!headsCache.has(key)) {
-    headsCache.set(key, (async () => (await import('../../../shared/pdfMusic')).transcribe(await pdfShapes(url, range), { title: '', transposition: 0 }))().catch((e) => { headsCache.delete(key); throw e; }));
+    headsCache.set(key, (async () => {
+      if (kind === 'pdf') {
+        const t = (await import('../../../shared/pdfMusic')).transcribe(await pdfShapes(url, range), { title: '', transposition: 0 });
+        if (t.heads.length) return t;
+      }
+      return imageHeads(url, kind, range);
+    })().catch((e) => { headsCache.delete(key); throw e; }));
   }
   return headsCache.get(key)!;
+}
+
+/** Cabezas de nota buscadas en la imagen de cada página (foto o escaneo). Las alturas son las escritas, sin alteraciones. */
+async function imageHeads(url: string, kind: 'pdf' | 'image', range?: [number, number] | null): Promise<HeadSource> {
+  const { detectImageHeads } = await import('../../../shared/imageHeads');
+  const { STEPS } = await import('../../../shared/music');
+  // páginas propias (no las del visor: renderizar en ellas cancelaría el dibujo que está viendo el músico)
+  const all = kind === 'pdf' ? await loadPdf(url) : await loadPages(url, kind);
+  const pages = range ? all.slice(range[0] - 1, range[1]) : all;
+  const notes: any[] = []; const heads: Transcription['heads'] = [];
+  for (let pi = 0; pi < pages.length; pi++) {
+    const cv = document.createElement('canvas');
+    const W = 2400;
+    await pages[pi].render(cv, W / Math.min(window.devicePixelRatio || 1, 3));
+    const w = cv.width, h = cv.height;
+    const data = cv.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, w, h).data;
+    const gray = new Uint8Array(w * h);
+    for (let i = 0; i < gray.length; i++) gray[i] = (data[i * 4] * 77 + data[i * 4 + 1] * 150 + data[i * 4 + 2] * 29) >> 8;
+    for (const hd of detectImageHeads(gray, w, h)) {
+      const idx = 30 + hd.pos; // 30 = Mi4, línea inferior en clave de sol
+      const id = `img${notes.length}`;
+      notes.push({ id, dur: 'q', step: STEPS[((idx % 7) + 7) % 7], octave: Math.floor(idx / 7) });
+      heads.push({ id, page: pi + 1, x: hd.x / w, y: hd.y / h, w: hd.w / w, h: hd.h / h, below: hd.below / h, s: hd.s / h, line: hd.pos % 2 === 0 });
+    }
+    await new Promise((r) => setTimeout(r, 0)); // deja respirar a la página entre hoja y hoja
+  }
+  const doc = { schema: 1, title: '', clef: 'treble', key: 0, time: [4, 4], tempo: 90, transposition: 0, measures: [{ id: 'm', n: 1, notes }] } as any;
+  return { doc, review: [], notes: notes.length, warnings: [], heads, approx: true };
 }
