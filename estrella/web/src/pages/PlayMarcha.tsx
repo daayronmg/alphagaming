@@ -5,6 +5,9 @@ import { get, post, put, del } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useLoad, Spinner, ErrorBox, Notice, useToast, Modal, Field } from '../components/ui';
 import StaffView from '../components/StaffView';
+import ScoreCanvas, { type MeasureBox } from '../components/ScoreCanvas';
+import { toggleFullscreen, isFullscreen, onFullscreen } from '../lib/fullscreen';
+import { fileUrl } from '../lib/api';
 import AudioPlayer from '../components/AudioPlayer';
 import { playScores, unlockAudio, loadCornetSamples, cornetSamplesReady, type ScorePlayback } from '../lib/audio';
 import { transcribePdf } from '../lib/pdf';
@@ -88,6 +91,12 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const published = ((m.data?.scores ?? []) as any[]).filter((x) => x.published_version_id);
   const scoreId = (voice ?? m.data?.mine?.score?.id ?? (!m.data?.mine?.assignment ? published[0]?.id : undefined)) as string | undefined;
   const score = useLoad(() => (scoreId ? get(`/scores/${scoreId}?light=1`) : Promise.resolve(null)), [scoreId]);
+  // la partitura original (PDF o foto) de tu parte, con su mapa de compases para seguir la música
+  const partId = m.data?.mine?.part?.id as string | undefined;
+  const partInfo = useLoad(() => (partId ? get(`/library/parts/${partId}`) : Promise.resolve(null)), [partId]);
+  // por defecto se ve el original tal cual; la versión redibujada (con nombres de notas) solo si se pide
+  const [view, setView] = useState<'original' | 'notas'>(() => { try { return localStorage.getItem('estrella.view') === 'notas' ? 'notas' : 'original'; } catch { return 'original'; } });
+  useEffect(() => { try { localStorage.setItem('estrella.view', view); } catch { /* */ } }, [view]);
   const [playing, setPlaying] = useState(false);
   const [noteId, setNoteId] = useState<string | null>(null);
   const [measure, setMeasure] = useState<number | null>(null);
@@ -109,16 +118,14 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
     ro.observe(box); setFitH(box.clientHeight);
     return () => ro.disconnect();
   }, [box]);
-  const [full, setFull] = useState(() => typeof document !== 'undefined' && !!document.fullscreenElement);
-  useEffect(() => {
-    const on = () => setFull(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', on);
-    return () => document.removeEventListener('fullscreenchange', on);
-  }, []);
+  const [full, setFull] = useState(() => typeof document !== 'undefined' && isFullscreen());
+  useEffect(() => onFullscreen(() => setFull(isFullscreen())), []);
+  // al salir de la marcha, se quita el modo foco
+  useEffect(() => () => { document.documentElement.classList.remove('pseudo-full'); }, []);
   // la partitura acompaña a la música: se desplaza al compás que suena
   useEffect(() => {
     if (measure == null) return;
-    staffBox.current?.querySelector('[data-testid=score-measure-highlight]')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    staffBox.current?.querySelector('[data-testid=score-measure-highlight], [data-testid=measure-highlight]')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [measure]);
   // si la dirección corrige las notas, se ven al momento
   useRealtime((x) => { if (['parts:changed', 'score:published'].includes(x.t) && x.marchaId === id) { m.reload(); score.reload(); } }, [id, scoreId]);
@@ -135,6 +142,15 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   // corneta de llaves Do/Reb: debajo de cada nota, la posición (| Do, — Reb)
   const cornet = /corneta/i.test(published.find((p) => p.id === scoreId)?.label ?? mine.assignment?.instrument ?? '');
   const review: number[] = score.data?.review_measures ?? [];
+  // el original solo corresponde a tu voz (si la dirección escucha otra voz, se ve la redibujada)
+  const showOriginal = view === 'original' && !!mine.part && (!voice || scoreId === mine.score?.id);
+  const map = (partInfo.data?.measures_map ?? []) as MeasureBox[];
+  const curBox = measure != null ? map.find((b) => b.measure === measure) : undefined;
+  const original = mine.part && (
+    <ScoreCanvas url={fileUrl(mine.part.file_id)} range={mine.part.page_from ? [mine.part.page_from, mine.part.page_to] : null}
+      kind={mine.part.file_kind === 'image' ? 'image' : 'pdf'} zoom={1} tool="none" color="#000" width={3} symbol=""
+      annotations={[]} measureMap={map} highlights={curBox ? [{ ...curBox, variant: 'current' }] : []} />
+  );
 
   const stop = () => { pb.current?.stop(); pb.current = null; setPlaying(false); setNoteId(null); setMeasure(null); };
   const play = async () => {
@@ -171,10 +187,20 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const nextSpeed = () => { setSpeed(speeds[(speeds.indexOf(speed) + 1) % speeds.length] ?? 100); if (playing) stop(); };
   // pantalla completa y, donde el móvil lo permite (Android), giro a horizontal; en iPhone basta con girarlo
   const goFull = async () => {
-    if (document.fullscreenElement) { (screen.orientation as any)?.unlock?.(); await document.exitFullscreen?.().catch(() => {}); return; }
-    try { await document.documentElement.requestFullscreen?.(); await (screen.orientation as any)?.lock?.('landscape'); }
-    catch { if (!land) toast({ kind: 'info', text: 'Gira el móvil en horizontal para ver la marcha completa.' }); }
+    const was = isFullscreen();
+    await toggleFullscreen();
+    if (was) { (screen.orientation as any)?.unlock?.(); return; }
+    if (phone) { try { await (screen.orientation as any)?.lock?.('landscape'); } catch { if (!land) toast({ kind: 'info', text: 'Gira el móvil en horizontal para ver la marcha completa.' }); } }
   };
+  const fullBtn = (cls: string, size: number) => (
+    <button className={cls} onClick={goFull} aria-label={full ? 'Salir de pantalla completa' : 'Pantalla completa'} title={full ? 'Salir de pantalla completa' : 'Pantalla completa'} data-testid="fullscreen">
+      {full ? <Minimize size={size} /> : <Maximize size={size} />}
+    </button>
+  );
+  // cambiar entre el original y la versión con nombres de notas
+  const viewBtn = (cls: string) => mine.part && (!voice || scoreId === mine.score?.id) && (
+    <button className={cls} onClick={() => setView(view === 'original' ? 'notas' : 'original')} data-testid="view-toggle">{view === 'original' ? 'Con nombres' : 'Original'}</button>
+  );
   const turnHint = phone && !land && doc && (
     <button className="btn sm turn-hint" onClick={goFull}><RotateCw size={15} /> Gira el móvil para ver la marcha completa</button>
   );
@@ -195,14 +221,13 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
             {playing ? <><Square size={16} /> Parar</> : <><Play size={16} /> Reproducir</>}
           </button>
           <button className="btn full-btn" onClick={nextSpeed} aria-label="Velocidad">{speed} %</button>
-          <button className={`btn full-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>
+          {viewBtn('btn full-btn')}
+          {!showOriginal && <button className={`btn full-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>}
           <button className={`btn full-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">Metr.</button>
-          {'requestFullscreen' in document.documentElement && (
-            <button className="btn icon ghost" onClick={goFull} aria-label="Pantalla completa">{full ? <Minimize size={18} /> : <Maximize size={18} />}</button>
-          )}
+          {fullBtn('btn icon ghost', 18)}
         </div>
         <div className="full-score" ref={setBox}>
-          {fitH > 0 && <StaffView doc={doc} colorMode noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} fitHeight={fitH - 4} />}
+          {showOriginal ? original : fitH > 0 && <StaffView doc={doc} colorMode noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} fitHeight={fitH - 4} />}
         </div>
       </div>
     );
@@ -217,10 +242,11 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
           <div className="solo-top">
             <button className="btn icon ghost" onClick={() => (history.length > 1 ? nav(-1) : nav('/'))} aria-label="Volver"><ChevronLeft size={22} /></button>
             <div className="grow" />
-            {mine.part && <Link className="btn sm ghost" to={`/partitura/${mine.part.id}`}><FileText size={15} /> Original</Link>}
+            {mine.part && !showOriginal && <Link className="btn sm ghost" to={`/partitura/${mine.part.id}`}><FileText size={15} /> Original</Link>}
             {can('scores.publish') && scoreId && <Link className="btn sm ghost" to={`/score/${scoreId}`}><Pencil size={15} /> Notas</Link>}
             {can('library.manage') && !x.private && <Link to={`/marchas/${x.id}`} className="btn sm ghost">Ficha</Link>}
             {x.private && <button className="btn sm ghost" onClick={async () => { if (!confirm(`¿Borrar «${x.title}»? Es tuya y solo la ves tú.`)) return; try { await del(`/library/private/marchas/${x.id}`); nav('/'); } catch (e) { toast({ kind: 'error', text: (e as Error).message }); } }} aria-label="Borrar"><Trash2 size={15} /></button>}
+            {fullBtn('btn icon ghost', 20)}
           </div>
         )}
         <div className="live-title">
@@ -235,22 +261,24 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
         {x.private && <span className="badge" style={{ alignSelf: 'flex-start' }}><Lock size={12} /> Marcha tuya: solo la ves tú</span>}
         {mine.status !== 'ok' && mine.assignment && <Notice kind="warn" title="Tu parte no está disponible">{mine.message}</Notice>}
         <div className="row" style={{ gap: 8 }}>{turnHint}<HowTo marcha={x} canEdit={!embedded && can('library.manage')} onSaved={m.reload} /></div>
-        <div className="live-score" ref={staffBox}>
-          <StaffView doc={doc} colorMode noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.6 : 1} />
-          <p className="xs faint" style={{ margin: '10px 4px 0' }}>
+        <div className={`live-score ${showOriginal ? 'is-original' : ''}`} ref={staffBox}>
+          {showOriginal ? original : <StaffView doc={doc} colorMode noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.6 : 1} />}
+          {!showOriginal && <p className="xs faint" style={{ margin: '10px 4px 0' }}>
             <span style={{ color: '#dc2626', fontWeight: 700 }}>Rojo</span>: en línea · <span style={{ color: '#2563eb', fontWeight: 700 }}>Azul</span>: en espacio · Verde: la que suena
             {cornet && names && <> · <b>|</b> posición de Do · <b>—</b> posición de Reb</>}
             {review.length ? ` · Revisa los compases ${review.slice(0, 6).join(', ')}` : ''}
             {!embedded && ' · ¿No se oye? Sube el volumen y quita el modo silencio.'}
-          </p>
+          </p>}
         </div>
         <div className="live-dock">
           <button className={`btn live-play-btn ${playing ? '' : 'primary'}`} onClick={play} data-testid="play-march">
             {playing ? <><Square size={20} /> Parar</> : <><Play size={22} /> Reproducir</>}
           </button>
           <button className="btn live-chip-btn" onClick={nextSpeed} aria-label="Velocidad"><Gauge size={16} /> {speed} %</button>
-          <button className={`btn live-chip-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>
+          {viewBtn('btn live-chip-btn')}
+          {!showOriginal && <button className={`btn live-chip-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>}
           <button className={`btn live-chip-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">{narrow ? 'Metr.' : 'Metrónomo'}</button>
+          {embedded && fullBtn('btn live-chip-btn', 16)}
         </div>
       </div>
     );
