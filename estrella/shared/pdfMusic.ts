@@ -126,7 +126,7 @@ export interface Transcription {
  * Cabeza de una nota transcrita en su página (0–1 desde arriba a la izquierda).
  * `below` es la altura bajo el pentagrama donde cabe un rótulo y `s` el espacio entre líneas (en alto de página).
  */
-export interface NoteHead { id: string; page: number; x: number; y: number; w: number; h: number; below: number; s: number }
+export interface NoteHead { id: string; page: number; x: number; y: number; w: number; h: number; below: number; s: number; line?: boolean }
 
 interface Staff { top: number; bottom: number; s: number; x0: number; x1: number; page: number }
 interface Ev { x: number; kind: 'note' | 'rest' | 'measureRest'; y: number; glyph: Glyph; dur: Dur; dots: number; pos?: number; alter?: number | null; tie?: boolean; artic: Set<Note['artic'] extends (infer A)[] | undefined ? A : never>; dyn?: Note['dyn'] }
@@ -382,7 +382,7 @@ export function transcribe(pages: PageShapes[], opts: { title: string; transposi
           pendingTie = null;
           notes.push(n);
           const hw = (e.glyph.ch === 'w' ? 1.62 : 1.2) * s;
-          noteHeads.push({ id: n.id, page: pi + 1, x: (e.x - 0.12 * s) / p.width, y: (e.y - 0.62 * s) / p.height, w: (hw + 0.24 * s) / p.width, h: (1.24 * s) / p.height, below: (st.bottom + 2.6 * s) / p.height, s: s / p.height });
+          noteHeads.push({ id: n.id, page: pi + 1, x: (e.x - 0.12 * s) / p.width, y: (e.y - 0.62 * s) / p.height, w: (hw + 0.24 * s) / p.width, h: (1.24 * s) / p.height, below: (st.bottom + 2.6 * s) / p.height, s: s / p.height, line: e.pos! % 2 === 0 });
         }
         // une las ligaduras dentro del compás
         for (let k = 0; k < notes.length; k++) {

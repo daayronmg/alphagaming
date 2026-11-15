@@ -105,8 +105,8 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
     ? noteheadMarksFromPdf(`/api/files/${partFile.file_id}`, partFile.page_from ? [partFile.page_from, partFile.page_to] : null).catch(() => null)
     : Promise.resolve(null)), [partFile?.id]);
   // las notas del original con su sitio en la página: para poner su nombre debajo y señalar la que suena
-  const pdfNotes = useLoad(() => (partFile && partFile.file_kind !== 'image'
-    ? noteHeadsFromPdf(`/api/files/${partFile.file_id}`, partFile.page_from ? [partFile.page_from, partFile.page_to] : null).catch(() => null)
+  const pdfNotes = useLoad(() => (partFile
+    ? noteHeadsFromPdf(`/api/files/${partFile.file_id}`, partFile.page_from ? [partFile.page_from, partFile.page_to] : null, partFile.file_kind === 'image' ? 'image' : 'pdf').catch(() => null)
     : Promise.resolve(null)), [partFile?.id]);
   // nombres de las notas encima del original: opción (de serie, sin nada: la partitura tal cual)
   const [origNames, setOrigNames] = useState(() => { try { return localStorage.getItem('estrella.origNames') === '1'; } catch { return false; } });
@@ -119,6 +119,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const [metro, setMetro] = useState(false);
   const [busy, setBusy] = useState(false);
   const pb = useRef<ScorePlayback | null>(null);
+  const lastHead = useRef<string | null>(null);
   const staffBox = useRef<HTMLDivElement>(null);
   const narrow = typeof window !== 'undefined' && window.innerWidth < 600;
   // móvil en horizontal: la marcha completa en una pantalla
@@ -171,11 +172,15 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const map = (partInfo.data?.measures_map ?? []) as MeasureBox[];
   const curBox = measure != null ? map.find((b) => b.measure === measure) : undefined;
   const heads = showOriginal && doc && pdfNotes.data?.heads.length ? followHeads(pdfNotes.data, doc, cornet) : null;
+  // en silencios (o en una nota que no se ha encontrado en la foto) el verde se queda en la última que sonó
+  if (!playing) lastHead.current = null;
+  else if (noteId && heads?.some((h) => h.id === noteId)) lastHead.current = noteId;
+  const shownHead = playing ? lastHead.current : null;
   const original = mine.part && (
     <ScoreCanvas url={fileUrl(mine.part.file_id)} range={mine.part.page_from ? [mine.part.page_from, mine.part.page_to] : null}
       kind={mine.part.file_kind === 'image' ? 'image' : 'pdf'} zoom={1} tool="none" color="#000" width={3} symbol=""
-      annotations={[]} measureMap={map} highlights={curBox ? [{ ...curBox, variant: 'current' }] : []} tint={colors ? marks.data ?? null : null}
-      heads={heads} names={origNames} playingId={noteId} />
+      annotations={[]} measureMap={map} highlights={curBox ? [{ ...curBox, variant: 'current' }] : []} tint={colors ? (marks.data?.length ? marks.data : heads?.filter((h) => h.line != null) as any) ?? null : null}
+      heads={heads} names={origNames} playingId={shownHead} />
   );
 
   const stop = () => { pb.current?.stop(); pb.current = null; setPlaying(false); setNoteId(null); setMeasure(null); };
