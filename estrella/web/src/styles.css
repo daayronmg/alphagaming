@@ -289,6 +289,8 @@ textarea.input { min-height: 96px; resize: vertical; }
 .score-page { position: relative; margin: 0 auto 18px; background: #fff; box-shadow: 0 6px 30px rgba(0,0,0,.35); border-radius: 4px; touch-action: pan-x pan-y; }
 .score-page canvas { display: block; width: 100%; height: auto; border-radius: 4px; }
 .score-page .layer { position: absolute; inset: 0; width: 100%; height: 100%; }
+.score-page .heads-layer { pointer-events: none; }
+.heads-layer .head-name { font-family: 'Inter Variable', system-ui, sans-serif; font-weight: 700; text-anchor: middle; dominant-baseline: hanging; paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }
 .score-page.drawing { touch-action: none; cursor: crosshair; }
 .score-page .page-no { position: absolute; top: -14px; right: 0; font-size: .7rem; color: #ccd; }
 .measure-hl { position: absolute; border: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 6px; pointer-events: none; transition: all .35s var(--ease); box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent); }

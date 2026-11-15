@@ -118,7 +118,15 @@ export interface Transcription {
   review: number[];
   notes: number;
   warnings: string[];
+  /** dónde está en el PDF la cabeza de cada nota transcrita (para señalarla encima del original) */
+  heads: NoteHead[];
 }
+
+/**
+ * Cabeza de una nota transcrita en su página (0–1 desde arriba a la izquierda).
+ * `below` es la altura bajo el pentagrama donde cabe un rótulo y `s` el espacio entre líneas (en alto de página).
+ */
+export interface NoteHead { id: string; page: number; x: number; y: number; w: number; h: number; below: number; s: number }
 
 interface Staff { top: number; bottom: number; s: number; x0: number; x1: number; page: number }
 interface Ev { x: number; kind: 'note' | 'rest' | 'measureRest'; y: number; glyph: Glyph; dur: Dur; dots: number; pos?: number; alter?: number | null; tie?: boolean; artic: Set<Note['artic'] extends (infer A)[] | undefined ? A : never>; dyn?: Note['dyn'] }
@@ -195,6 +203,7 @@ export function transcribe(pages: PageShapes[], opts: { title: string; transposi
   let pendingTie: { pos: number } | null = null;
   let nextN = 1;
   let started = false;
+  const noteHeads: NoteHead[] = [];
 
   pages.forEach((p, pi) => {
     const staves = findStaves(p, pi + 1);
@@ -372,6 +381,8 @@ export function transcribe(pages: PageShapes[], opts: { title: string; transposi
           }
           pendingTie = null;
           notes.push(n);
+          const hw = (e.glyph.ch === 'w' ? 1.62 : 1.2) * s;
+          noteHeads.push({ id: n.id, page: pi + 1, x: (e.x - 0.12 * s) / p.width, y: (e.y - 0.62 * s) / p.height, w: (hw + 0.24 * s) / p.width, h: (1.24 * s) / p.height, below: (st.bottom + 2.6 * s) / p.height, s: s / p.height });
         }
         // une las ligaduras dentro del compás
         for (let k = 0; k < notes.length; k++) {
@@ -428,7 +439,7 @@ export function transcribe(pages: PageShapes[], opts: { title: string; transposi
   });
   if (chords) warnings.push(`${chords} notas dobles: se ha tomado la más aguda.`);
   const doc: ScoreDoc = { schema: 1, title: opts.title, clef: 'treble', key: firstKey ?? 0, time: docTime, tempo: tempo || 90, transposition: opts.transposition, measures };
-  return { doc, review, notes: measures.reduce((a, m) => a + m.notes.filter((n) => !n.rest).length, 0), warnings };
+  return { doc, review, notes: measures.reduce((a, m) => a + m.notes.filter((n) => !n.rest).length, 0), warnings, heads: noteHeads };
 }
 
 // ===== Colores sobre el original =====

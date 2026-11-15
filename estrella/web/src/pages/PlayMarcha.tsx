@@ -10,7 +10,8 @@ import { toggleFullscreen, isFullscreen, onFullscreen } from '../lib/fullscreen'
 import { fileUrl } from '../lib/api';
 import AudioPlayer from '../components/AudioPlayer';
 import { playScores, unlockAudio, loadCornetSamples, cornetSamplesReady, type ScorePlayback } from '../lib/audio';
-import { transcribePdf, noteheadMarksFromPdf } from '../lib/pdf';
+import { transcribePdf, noteheadMarksFromPdf, noteHeadsFromPdf } from '../lib/pdf';
+import { followHeads } from '../lib/follow';
 import { useRealtime } from '../lib/realtime';
 import type { ScoreDoc } from '../../../shared/music';
 
@@ -103,6 +104,13 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const marks = useLoad(() => (partFile && partFile.file_kind !== 'image'
     ? noteheadMarksFromPdf(`/api/files/${partFile.file_id}`, partFile.page_from ? [partFile.page_from, partFile.page_to] : null).catch(() => null)
     : Promise.resolve(null)), [partFile?.id]);
+  // las notas del original con su sitio en la página: para poner su nombre debajo y señalar la que suena
+  const pdfNotes = useLoad(() => (partFile && partFile.file_kind !== 'image'
+    ? noteHeadsFromPdf(`/api/files/${partFile.file_id}`, partFile.page_from ? [partFile.page_from, partFile.page_to] : null).catch(() => null)
+    : Promise.resolve(null)), [partFile?.id]);
+  // nombres de las notas encima del original: opción (de serie, sin nada: la partitura tal cual)
+  const [origNames, setOrigNames] = useState(() => { try { return localStorage.getItem('estrella.origNames') === '1'; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem('estrella.origNames', origNames ? '1' : '0'); } catch { /* */ } }, [origNames]);
   const [playing, setPlaying] = useState(false);
   const [noteId, setNoteId] = useState<string | null>(null);
   const [measure, setMeasure] = useState<number | null>(null);
@@ -130,9 +138,18 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   useEffect(() => () => { document.documentElement.classList.remove('pseudo-full'); }, []);
   // la partitura acompaña a la música: se desplaza al compás que suena
   useEffect(() => {
-    if (measure == null) return;
-    staffBox.current?.querySelector('[data-testid=score-measure-highlight], [data-testid=measure-highlight]')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (measure == null || document.querySelector('[data-testid=note-playing]')) return;
+    document.querySelector('[data-testid=score-measure-highlight], [data-testid=measure-highlight]')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [measure]);
+  // sobre el original se sigue nota a nota: solo se mueve cuando la que suena se va saliendo de la vista
+  useEffect(() => {
+    if (!noteId) return;
+    const el = document.querySelector('[data-testid=note-playing]');
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const vh = window.innerHeight, vw = window.innerWidth;
+    if (r.top < vh * 0.12 || r.bottom > vh * 0.72 || r.left < 0 || r.right > vw) el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+  }, [noteId]);
   // si la dirección corrige las notas, se ven al momento
   useRealtime((x) => { if (['parts:changed', 'score:published'].includes(x.t) && x.marchaId === id) { m.reload(); score.reload(); } }, [id, scoreId]);
   useEffect(() => () => pb.current?.stop(), []);
@@ -153,10 +170,12 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const showOriginal = !!mine.part && (!voice || scoreId === mine.score?.id);
   const map = (partInfo.data?.measures_map ?? []) as MeasureBox[];
   const curBox = measure != null ? map.find((b) => b.measure === measure) : undefined;
+  const heads = showOriginal && doc && pdfNotes.data?.heads.length ? followHeads(pdfNotes.data, doc, cornet) : null;
   const original = mine.part && (
     <ScoreCanvas url={fileUrl(mine.part.file_id)} range={mine.part.page_from ? [mine.part.page_from, mine.part.page_to] : null}
       kind={mine.part.file_kind === 'image' ? 'image' : 'pdf'} zoom={1} tool="none" color="#000" width={3} symbol=""
-      annotations={[]} measureMap={map} highlights={curBox ? [{ ...curBox, variant: 'current' }] : []} tint={colors ? marks.data ?? null : null} />
+      annotations={[]} measureMap={map} highlights={curBox ? [{ ...curBox, variant: 'current' }] : []} tint={colors ? marks.data ?? null : null}
+      heads={heads} names={origNames} playingId={noteId} />
   );
 
   const stop = () => { pb.current?.stop(); pb.current = null; setPlaying(false); setNoteId(null); setMeasure(null); };
@@ -208,6 +227,12 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
     <button className={`${cls} ${colors ? 'primary' : ''}`} onClick={() => setColors(!colors)} aria-pressed={colors} data-testid="colors-toggle">Colores</button>
   );
 
+  // «Notas»: el nombre de cada nota (y en corneta la posición | Do / — Reb) debajo, también sobre el original
+  const namesOn = showOriginal ? origNames : names;
+  const notesBtn = (cls: string) => (showOriginal && !heads ? null : (
+    <button className={`${cls} ${namesOn ? 'primary' : ''}`} onClick={() => (showOriginal ? setOrigNames(!origNames) : setNames(!names))} aria-pressed={namesOn} data-testid="names-toggle">Notas</button>
+  ));
+
   const turnHint = phone && !land && doc && (
     <button className="btn sm turn-hint" onClick={goFull}><RotateCw size={15} /> Gira el móvil para ver la marcha completa</button>
   );
@@ -229,7 +254,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
           </button>
           <button className="btn full-btn" onClick={nextSpeed} aria-label="Velocidad">{speed} %</button>
           {colorBtn('btn full-btn')}
-          {!showOriginal && <button className={`btn full-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>}
+          {notesBtn('btn full-btn')}
           <button className={`btn full-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">Metr.</button>
           {fullBtn('btn icon ghost', 18)}
         </div>
@@ -270,6 +295,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
         <div className="row" style={{ gap: 8 }}>{turnHint}<HowTo marcha={x} canEdit={!embedded && can('library.manage')} onSaved={m.reload} /></div>
         <div className={`live-score ${showOriginal ? 'is-original' : ''}`} ref={staffBox}>
           {showOriginal ? original : <StaffView doc={doc} colorMode={colors} noteNames={names} cornetKeys={cornet} playingNoteId={noteId} currentMeasure={measure} scale={narrow ? 0.6 : 1} />}
+          {showOriginal && heads && origNames && cornet && <p className="xs faint" style={{ margin: '8px 4px 0' }}><b>|</b> posición de Do · <b>—</b> posición de Reb · Verde: la que suena</p>}
           {!showOriginal && <p className="xs faint" style={{ margin: '10px 4px 0' }}>
             <span style={{ color: '#dc2626', fontWeight: 700 }}>Rojo</span>: en línea · <span style={{ color: '#2563eb', fontWeight: 700 }}>Azul</span>: en espacio · Verde: la que suena
             {cornet && names && <> · <b>|</b> posición de Do · <b>—</b> posición de Reb</>}
@@ -283,7 +309,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
           </button>
           <button className="btn live-chip-btn" onClick={nextSpeed} aria-label="Velocidad"><Gauge size={16} /> {speed} %</button>
           {colorBtn('btn live-chip-btn')}
-          {!showOriginal && <button className={`btn live-chip-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>}
+          {notesBtn('btn live-chip-btn')}
           <button className={`btn live-chip-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">{narrow ? 'Metr.' : 'Metrónomo'}</button>
           {embedded && fullBtn('btn live-chip-btn', 16)}
         </div>

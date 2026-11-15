@@ -1,5 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPE } from 'react';
 import type { HeadMark } from '../../../shared/pdfMusic';
+import type { OverlayHead } from '../lib/follow';
 import { loadPages, type PageSource } from '../lib/pdf';
 import { Spinner, Notice } from './ui';
 
@@ -35,6 +36,10 @@ interface Props {
   penOnly?: boolean;
   /** cabezas de nota a colorear (en línea → rojo, en espacio → azul); null = original sin tocar */
   tint?: HeadMark[] | null;
+  /** notas del original: nombre (y posición de llave) debajo y la que suena señalada; no toca el dibujo */
+  heads?: OverlayHead[] | null;
+  names?: boolean;
+  playingId?: string | null;
 }
 
 const U = 1000; // unidades SVG del ancho de página
@@ -226,6 +231,15 @@ function Page({ src, index, width, props, registerCanvas }: { src: PageSource; i
   const measureAnns = props.annotations.filter((a) => !a.part_id && a.measure != null).map((a) => ({ a, box: props.measureMap.find((m) => m.measure === a.measure) })).filter((x) => x.box?.page === page);
   const ink = Object.entries(props.ink ?? {}).filter(([, s]) => s.page === page);
   const markers = (props.doubtMarkers ?? []).filter((m) => m.page === page);
+  const pageHeads = props.heads?.filter((h) => h.page === page) ?? [];
+  // hueco libre a cada lado de cada nota (en su mismo pentagrama), para que los nombres no se monten
+  const room = new Map<string, number>();
+  for (const h of pageHeads) {
+    const cx = h.x + h.w / 2;
+    let gap = 1;
+    for (const o of pageHeads) if (o !== h && Math.abs(o.below - h.below) < h.s * 0.5) gap = Math.min(gap, Math.abs(o.x + o.w / 2 - cx));
+    room.set(h.id, gap);
+  }
 
   return (
     <div className={`score-page ${active && props.tool !== 'select' ? 'drawing' : ''}`} style={{ width }} data-page={page}>
@@ -255,6 +269,26 @@ function Page({ src, index, width, props, registerCanvas }: { src: PageSource; i
         {ink.map(([id, s]) => <path key={id} d={pathFrom(s.points, ar)} fill="none" stroke={s.color} strokeWidth={(s.width ?? 3) * 1.4} strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />)}
         {draftShape}
       </svg>
+      {pageHeads.length > 0 && (
+        <svg className="layer heads-layer" viewBox={`0 0 ${U} ${U * ar}`} aria-hidden>
+          {pageHeads.map((h) => {
+            const now = h.id === props.playingId;
+            if (!now && !props.names) return null;
+            const sx = h.s * U * ar; // espacio entre líneas en unidades SVG
+            const cx = (h.x + h.w / 2) * U;
+            const ty = Math.max(h.below * U * ar, (h.y + h.h) * U * ar + sx * 1.6);
+            // letra lo más grande posible sin invadir la nota de al lado
+            const fs = Math.max(sx * 0.8, Math.min(sx * 1.55, ((room.get(h.id) ?? 1) * U * 0.92) / (h.name.length * 0.62)));
+            return (
+              <g key={h.id} data-testid={now ? 'note-playing' : undefined}>
+                {now && <rect x={h.x * U - sx * 0.35} y={h.y * U * ar - sx * 0.35} width={h.w * U + sx * 0.7} height={h.h * U * ar + sx * 0.7} rx={sx * 0.6} fill="rgba(22,163,74,.28)" stroke="#16a34a" strokeWidth={Math.max(2, sx * 0.22)} />}
+                {props.names && <text x={cx} y={ty} className="head-name" fontSize={fs} fill={now ? '#15803d' : '#374151'}>{h.name}</text>}
+                {props.names && h.key && <text x={cx} y={ty + sx * 1.7} className="head-name" fontSize={sx * 1.7} fill={now ? '#15803d' : '#111827'}>{h.key}</text>}
+              </g>
+            );
+          })}
+        </svg>
+      )}
     </div>
   );
 }
