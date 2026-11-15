@@ -5,6 +5,13 @@ export type Step = 'C' | 'D' | 'E' | 'F' | 'G' | 'A' | 'B';
 export type Dur = 'w' | 'h' | 'q' | '8' | '16' | '32';
 export type Clef = 'treble' | 'bass' | 'percussion';
 export type Articulation = 'staccato' | 'accent' | 'tenuto' | 'marcato' | 'fermata';
+/**
+ * Adornos del intérprete (se oyen, no cambian la figura):
+ * tr trino con la nota de arriba · tr2 trino solo en la segunda mitad · mord mordente (nota, arriba, nota)
+ * lmord mordente inferior · scoop arrastre corto desde medio tono por debajo
+ */
+export type Ornament = 'tr' | 'tr2' | 'mord' | 'lmord' | 'scoop';
+export const ORNAMENTS: Ornament[] = ['tr', 'tr2', 'mord', 'lmord', 'scoop'];
 export type Dynamic = 'pp' | 'p' | 'mp' | 'mf' | 'f' | 'ff' | 'sfz' | 'cresc' | 'dim';
 
 export interface Note {
@@ -21,6 +28,7 @@ export interface Note {
   tie?: boolean;
   artic?: Articulation[];
   dyn?: Dynamic;
+  orn?: Ornament;
 }
 
 export interface Measure {
@@ -34,6 +42,8 @@ export interface Measure {
   repeatEnd?: boolean;
   /** casilla de repetición (1ª o 2ª vez) */
   volta?: number;
+  /** «1ª vez»: dentro de una repetición solo suena la primera vuelta; en la segunda calla */
+  firstTimeOnly?: boolean;
 }
 
 export interface ScoreDoc {
@@ -225,6 +235,7 @@ export function validateScore(d: any): string | null {
       if (!n.rest) {
         if (!STEPS.includes(n.step) || !Number.isInteger(n.octave) || n.octave < 0 || n.octave > 9) return `Altura no válida (compás ${m.n})`;
         if (n.alter != null && (!Number.isInteger(n.alter) || Math.abs(n.alter) > 2)) return `Alteración no válida (compás ${m.n})`;
+        if (n.orn != null && !ORNAMENTS.includes(n.orn)) return `Adorno no válido (compás ${m.n})`;
       }
     }
   }

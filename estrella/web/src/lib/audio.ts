@@ -1,5 +1,5 @@
 // Audio: síntesis de partituras estructuradas, metrónomo preciso y detección de afinación.
-import { midiOf, midiToFreq, noteQuarters, playOrder, cornetPosition, type ScoreDoc } from '../../../shared/music';
+import { type Measure, type Ornament, midiOf, midiToFreq, noteQuarters, playOrder, cornetPosition, type ScoreDoc } from '../../../shared/music';
 
 let ctx: AudioContext | null = null;
 let out: AudioNode | null = null;
@@ -353,6 +353,26 @@ export function playRhythm(pattern: [string, boolean][], bpm = 80) {
 
 export interface ScorePlayback { stop: () => void; setVolume: (v: number) => void }
 
+/** Reparte una nota con adorno en [midi, segundos] (medido sobre el solista real). */
+function ornament(o: Ornament, midi: number, dur: number): [number, number][] {
+  const G = 0.065; // duración de cada nota de adorno
+  if (o === 'scoop') return dur > 2.5 * G ? [[midi - 1, G * 0.8], [midi, dur - G * 0.8]] : [[midi, dur]];
+  if (o === 'mord' || o === 'lmord') {
+    const nb = o === 'mord' ? midi + 1 : midi - 1;
+    return dur > 4 * G ? [[midi, G], [nb, G], [midi, dur - 2 * G]] : [[midi, dur]];
+  }
+  // trino con la nota de arriba (medio tono, como lo hace el solista); tr2 espera a la mitad
+  const out: [number, number][] = [];
+  const hold = o === 'tr2' ? dur * 0.5 : Math.min(0.12, dur * 0.2);
+  const end = Math.min(0.15, dur * 0.2);
+  out.push([midi, hold]);
+  let left = dur - hold - end, up = true;
+  const T = 0.075;
+  while (left >= T * 0.6) { const d = Math.min(T, left); out.push([up ? midi + 1 : midi, d]); left -= d; up = !up; }
+  out.push([midi, end + left]);
+  return out;
+}
+
 /**
  * Reproduce una o varias partes estructuradas entre dos compases.
  * Usa un planificador con antelación para mantener el tempo exacto.
@@ -371,7 +391,7 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
   const secPerQuarter = 60 / opts.tempo / beatQuarters;
   type Ev = {
     t: number; dur: number; midi: number | null; perc: boolean; gain: number; id: string; cornet: boolean;
-    vel: number; accent: boolean; staccato: boolean; fromMidi?: number | null; keyTurn?: boolean; tieOut?: boolean; retongue?: boolean; nextSame?: boolean;
+    vel: number; accent: boolean; staccato: boolean; orn?: Ornament; fromMidi?: number | null; keyTurn?: boolean; tieOut?: boolean; retongue?: boolean; nextSame?: boolean;
   };
   // matices: cada uno se mantiene hasta el siguiente
   const DYN: Record<string, number> = { pp: 0.4, p: 0.55, mp: 0.68, mf: 0.8, f: 0.92, ff: 1, sfz: 1 };
@@ -386,7 +406,11 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
     // con la obra entera se respetan las repeticiones; con un fragmento se toca tal cual
     const range = p.doc.measures.filter((m) => m.n >= opts.from && m.n <= opts.to);
     const seq = range.length === p.doc.measures.length ? playOrder(range) : range;
+    const played = new Set<Measure>();
     for (const m of seq) {
+      // «1ª vez»: en la segunda vuelta de la repetición ese compás calla
+      const silent = !!m.firstTimeOnly && played.has(m);
+      played.add(m);
       if (p === parts[0]) measureStarts.push({ n: m.n, t });
       const cap = (p.doc.time[0] * 4) / p.doc.time[1];
       let mt = 0;
@@ -394,13 +418,14 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
         const artic = n.artic ?? [];
         // el calderón alarga la nota
         const q = noteQuarters(n) * (artic.includes('fermata') ? 1.8 : 1);
-        const midi = n.rest || !n.step ? null : midiOf(n.step, n.octave!, n.alter ?? 0) + p.doc.transposition + (p.doc.tuning ?? 0);
+        const midi = silent || n.rest || !n.step ? null : midiOf(n.step, n.octave!, n.alter ?? 0) + p.doc.transposition + (p.doc.tuning ?? 0);
         if (n.dyn && DYN[n.dyn] != null) level = DYN[n.dyn];
         // nota ligada a la anterior de la misma altura: se prolonga, no se vuelve a atacar
         if (tied && midi != null && tied.midi === midi) tied.dur += q * secPerQuarter;
         else pev.push(tied = {
           t: t + mt * secPerQuarter, dur: q * secPerQuarter, midi, perc: !!p.perc || p.doc.clef === 'percussion', gain: p.gain, id: n.id, cornet: p.doc.clef === 'treble',
           vel: level, accent: artic.includes('accent') || artic.includes('marcato') || n.dyn === 'sfz', staccato: artic.includes('staccato'),
+          orn: midi != null ? n.orn : undefined,
         });
         if (!n.tie || midi == null) tied = null;
         mt += q;
@@ -409,6 +434,15 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
       t += (mt > 0 ? mt : cap) * secPerQuarter;
     }
     lenSec = Math.max(lenSec, t);
+    // adornos: la nota (ya con sus ligaduras) se reparte en notas rapidísimas enlazadas, como las toca el solista
+    for (let i = pev.length - 1; i >= 0; i--) {
+      const e = pev[i];
+      if (!e.orn || e.midi == null) continue;
+      const parts = ornament(e.orn, e.midi, e.dur);
+      if (parts.length < 2) continue;
+      let tt = e.t;
+      pev.splice(i, 1, ...parts.map(([pm, d], k) => { const x = { ...e, t: tt, dur: d, midi: pm, accent: e.accent && k === 0, orn: undefined }; tt += d; return x; }));
+    }
     // fraseo: notas pegadas (sin silencio entre medias) se enlazan; al cambiar de posición de llave, se oye el giro
     for (let i = 0; i + 1 < pev.length; i++) {
       const a = pev[i], b = pev[i + 1];
