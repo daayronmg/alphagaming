@@ -115,34 +115,45 @@ function street(c: AudioContext): ConvolverNode {
 interface CornetSample { start: number; dur: number; f0: number }
 let cornetBuf: AudioBuffer | null = null;
 let cornetNotes: CornetSample[] = [];
+// notas picadas (con el golpe de lengua de verdad): para las notas cortas y los comienzos de frase
+let shortBuf: AudioBuffer | null = null;
+let shortNotes: CornetSample[] = [];
 let cornetLoading: Promise<boolean> | null = null;
-/** Descarga y prepara las notas grabadas (una sola vez; se puede llamar antes del primer toque). */
+
+/** Descarga, decodifica y localiza el inicio real de cada nota de un juego de grabaciones. */
+async function loadSet(name: string, keepAttack: boolean): Promise<{ buf: AudioBuffer; notes: CornetSample[] }> {
+  const [meta, data] = await Promise.all([
+    fetch(`/sounds/${name}.json`).then((r) => { if (!r.ok) throw new Error('sin notas'); return r.json(); }),
+    fetch(`/sounds/${name}.mp3`).then((r) => { if (!r.ok) throw new Error('sin audio'); return r.arrayBuffer(); }),
+  ]);
+  // se decodifica fuera del contexto principal: no hace falta que el usuario haya tocado nada todavía
+  const dec = new OfflineAudioContext(1, 1, 44100);
+  const buf = await new Promise<AudioBuffer>((res, rej) => dec.decodeAudioData(data, res, rej));
+  // el MP3 añade unos milisegundos de silencio al principio: se busca dónde empieza de verdad cada nota
+  const d = buf.getChannelData(0), sr = buf.sampleRate;
+  const notes = (meta.notes as CornetSample[]).map((n) => {
+    let i = Math.max(0, Math.floor((n.start - 0.05) * sr));
+    const lim = Math.min(d.length, Math.floor((n.start + 0.2) * sr));
+    while (i < lim && Math.abs(d[i]) < 0.03) i++;
+    // las largas se toman ya en marcha (la envolvente hace la entrada); las picadas, con su ataque entero
+    const start = keepAttack ? Math.max(0, i / sr - 0.003) : i / sr + 0.015;
+    return { ...n, start, dur: n.dur - (start - n.start) };
+  });
+  return { buf, notes };
+}
 export function loadCornetSamples(): Promise<boolean> {
   if (cornetLoading) return cornetLoading;
   cornetLoading = (async () => {
-    const [meta, data] = await Promise.all([
-      fetch('/sounds/corneta.json').then((r) => { if (!r.ok) throw new Error('sin notas'); return r.json(); }),
-      fetch('/sounds/corneta.mp3').then((r) => { if (!r.ok) throw new Error('sin audio'); return r.arrayBuffer(); }),
-    ]);
-    // se decodifica fuera del contexto principal: no hace falta que el usuario haya tocado nada todavía
-    const dec = new OfflineAudioContext(1, 1, 44100);
-    const buf = await new Promise<AudioBuffer>((res, rej) => dec.decodeAudioData(data, res, rej));
-    // el MP3 añade unos milisegundos de silencio al principio: se busca dónde empieza de verdad cada nota
-    // (y se salta su pequeño fundido de entrada, la envolvente de cada nota ya lo hace)
-    const d = buf.getChannelData(0), sr = buf.sampleRate;
-    cornetNotes = (meta.notes as CornetSample[]).map((n) => {
-      let i = Math.max(0, Math.floor((n.start - 0.05) * sr));
-      const lim = Math.min(d.length, Math.floor((n.start + 0.2) * sr));
-      while (i < lim && Math.abs(d[i]) < 0.03) i++;
-      const start = i / sr + 0.015;
-      return { ...n, start, dur: n.dur - (start - n.start) };
-    });
-    cornetBuf = buf;
+    const long = await loadSet('corneta', false);
+    cornetBuf = long.buf; cornetNotes = long.notes;
+    // las picadas son un extra: si faltan, todo suena igual con las largas
+    loadSet('corneta-corta', true).then((sh) => { shortBuf = sh.buf; shortNotes = sh.notes; }).catch(() => {});
     return true;
   })().catch((e) => { console.warn('[audio] notas de corneta no disponibles', e); cornetLoading = null; return false; });
   return cornetLoading;
 }
 export const cornetSamplesReady = () => !!cornetBuf;
+const nearest = (list: CornetSample[], freq: number) => list.reduce((b, n) => (Math.abs(Math.log(freq / n.f0)) < Math.abs(Math.log(freq / b.f0)) ? n : b), list[0]);
 
 /** Cómo se enlaza una nota con la anterior y la siguiente (lo que da el fraseo). */
 export interface Phrase {
@@ -180,6 +191,33 @@ function cornetaReal(c: AudioContext, dest: AudioNode, freq: number, t: number, 
   const end = t + len;
   // ligada: se arranca de la parte estable de la grabación (sin el golpe de lengua de quien la grabó)
   const off = legIn ? Math.min(0.32, best.dur * 0.25) : 0;
+  // nota picada (empieza frase o repite nota): el ataque es el de verdad, sacado de las notas picadas grabadas
+  const sh = !legIn && shortBuf && shortNotes.length ? nearest(shortNotes, freq) : null;
+  const realAttack = !!sh;
+  if (sh) {
+    const rs = freq / sh.f0;
+    const ATT = 0.22; // cuánto de la picada se usa antes de pasar a la larga
+    const onlyShort = len * rs <= sh.dur - 0.08;
+    const s2 = c.createBufferSource(); s2.buffer = shortBuf; s2.playbackRate.value = rs;
+    const g2 = c.createGain(); const p2 = 0.6 * vel * (ph.accent ? 1.25 : 1);
+    g2.gain.setValueAtTime(p2, t);
+    if (onlyShort) {
+      const rel = ph.nextSame ? 0.022 : ph.tieOut ? 0.02 : ph.staccato ? 0.03 : Math.min(0.1, len * 0.3);
+      g2.gain.setValueAtTime(p2, Math.max(t + 0.01, t + len - rel));
+      if (ph.tieOut) g2.gain.setValueCurveAtTime(scaled(XF_OUT, p2), Math.max(t + 0.012, t + len - rel), rel);
+      else g2.gain.linearRampToValueAtTime(ph.nextSame ? p2 * 0.3 : 0.0001, t + len);
+    } else {
+      // cruce a la nota larga, ya estable
+      g2.gain.setValueAtTime(p2, t + ATT - 0.002);
+      g2.gain.setValueCurveAtTime(scaled(XF_OUT, p2), t + ATT, 0.03);
+    }
+    const w2 = c.createGain(); w2.gain.value = 0.3;
+    s2.connect(g2); g2.connect(dest); g2.connect(w2); w2.connect(street(c));
+    s2.start(t, sh.start); s2.stop(t + (onlyShort ? len : ATT + 0.03) + 0.03);
+    if (onlyShort) return true;
+    // la parte larga entra al terminar el ataque, como si fuera ligada consigo misma
+    return cornetaReal(c, dest, freq, t + ATT, Math.max(0.05, dur - ATT), vel, { ...ph, fromFreq: freq, keyTurn: false, retongue: false, accent: false });
+  }
   const src = c.createBufferSource();
   src.buffer = cornetBuf;
   if ((len + 0.05) * rate > best.dur - off - 0.2) { src.loop = true; src.loopStart = best.start + 0.8; src.loopEnd = best.start + best.dur - 0.2; }
@@ -229,7 +267,8 @@ function cornetaReal(c: AudioContext, dest: AudioNode, freq: number, t: number, 
   src.connect(env); env.connect(dest); env.connect(wet); wet.connect(street(c));
   src.start(t, best.start + off); src.stop(end + 0.03);
   // golpe de lengua: un soplo muy corto al empezar frase, al repetir nota o con acento
-  if (!legIn) {
+  // (solo si no hay ataque grabado de verdad: con las notas picadas, el golpe es el suyo)
+  if (!legIn && !realAttack) {
     const n = c.createBufferSource(); const nb = c.createBuffer(1, Math.floor(c.sampleRate * 0.02), c.sampleRate);
     const nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
     n.buffer = nb;
