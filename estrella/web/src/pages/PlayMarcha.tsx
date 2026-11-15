@@ -94,9 +94,8 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   // la partitura original (PDF o foto) de tu parte, con su mapa de compases para seguir la música
   const partId = m.data?.mine?.part?.id as string | undefined;
   const partInfo = useLoad(() => (partId ? get(`/library/parts/${partId}`) : Promise.resolve(null)), [partId]);
-  // por defecto se ve el original tal cual; la versión redibujada (con nombres de notas) solo si se pide
-  const [view, setView] = useState<'original' | 'notas'>(() => { try { return localStorage.getItem('estrella.view') === 'notas' ? 'notas' : 'original'; } catch { return 'original'; } });
-  useEffect(() => { try { localStorage.setItem('estrella.view', view); } catch { /* */ } }, [view]);
+  // la partitura es siempre la original, tal cual: no hay ninguna opción que la redibuje
+  useEffect(() => { try { localStorage.removeItem('estrella.view'); } catch { /* */ } }, []);
   // colores de las notas (en línea rojo, en espacio azul): de serie sí; se pueden quitar
   const [colors, setColors] = useState(() => { try { return localStorage.getItem('estrella.colors') !== '0'; } catch { return true; } });
   useEffect(() => { try { localStorage.setItem('estrella.colors', colors ? '1' : '0'); } catch { /* */ } }, [colors]);
@@ -150,7 +149,8 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const cornet = /corneta/i.test(published.find((p) => p.id === scoreId)?.label ?? mine.assignment?.instrument ?? '');
   const review: number[] = score.data?.review_measures ?? [];
   // el original solo corresponde a tu voz (si la dirección escucha otra voz, se ve la redibujada)
-  const showOriginal = view === 'original' && !!mine.part && (!voice || scoreId === mine.score?.id);
+  // (solo sin original —p. ej. otra voz que escucha la dirección— se dibuja a partir de las notas)
+  const showOriginal = !!mine.part && (!voice || scoreId === mine.score?.id);
   const map = (partInfo.data?.measures_map ?? []) as MeasureBox[];
   const curBox = measure != null ? map.find((b) => b.measure === measure) : undefined;
   const original = mine.part && (
@@ -207,10 +207,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const colorBtn = (cls: string) => (
     <button className={`${cls} ${colors ? 'primary' : ''}`} onClick={() => setColors(!colors)} aria-pressed={colors} data-testid="colors-toggle">Colores</button>
   );
-  // cambiar entre el original y la versión con nombres de notas
-  const viewBtn = (cls: string) => mine.part && (!voice || scoreId === mine.score?.id) && (
-    <button className={cls} onClick={() => setView(view === 'original' ? 'notas' : 'original')} data-testid="view-toggle">{view === 'original' ? (narrow ? 'Nombres' : 'Con nombres') : 'Original'}</button>
-  );
+
   const turnHint = phone && !land && doc && (
     <button className="btn sm turn-hint" onClick={goFull}><RotateCw size={15} /> Gira el móvil para ver la marcha completa</button>
   );
@@ -232,7 +229,6 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
           </button>
           <button className="btn full-btn" onClick={nextSpeed} aria-label="Velocidad">{speed} %</button>
           {colorBtn('btn full-btn')}
-          {viewBtn('btn full-btn')}
           {!showOriginal && <button className={`btn full-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>}
           <button className={`btn full-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">Metr.</button>
           {fullBtn('btn icon ghost', 18)}
@@ -287,7 +283,6 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
           </button>
           <button className="btn live-chip-btn" onClick={nextSpeed} aria-label="Velocidad"><Gauge size={16} /> {speed} %</button>
           {colorBtn('btn live-chip-btn')}
-          {viewBtn('btn live-chip-btn')}
           {!showOriginal && <button className={`btn live-chip-btn ${names ? 'primary' : ''}`} onClick={() => setNames(!names)} aria-pressed={names}>Notas</button>}
           <button className={`btn live-chip-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">{narrow ? 'Metr.' : 'Metrónomo'}</button>
           {embedded && fullBtn('btn live-chip-btn', 16)}
