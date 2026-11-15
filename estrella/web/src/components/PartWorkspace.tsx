@@ -4,6 +4,7 @@ import {
   ZoomIn, ZoomOut, Maximize, Minimize, Hand, PenTool, Highlighter, Minus, MoveUpRight, Square, Circle, Type, Stamp, Eraser, MousePointer2,
   Undo2, Redo2, MessageCircleQuestion, PanelRight, Download, Layers, Hash, AlertTriangle, ScanLine, Play, Pause, Trash2, History, Music, Save, ChevronLeft,
 } from './icons';
+import { toggleFullscreen, isFullscreen, onFullscreen } from '../lib/fullscreen';
 import ScoreCanvas, { type Tool, type Ann, type MeasureBox, type Highlight } from './ScoreCanvas';
 import { useAnnotations } from '../lib/annotations';
 import { get, put, upload, fileUrl } from '../lib/api';
@@ -115,9 +116,7 @@ export default function PartWorkspace({ partId, live, header, initialMeasure, in
   }, [autoScroll]);
 
   useEffect(() => {
-    const f = () => setFs(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', f);
-    return () => document.removeEventListener('fullscreenchange', f);
+    return onFullscreen(() => setFs(isFullscreen()));
   }, []);
 
   useEffect(() => {
@@ -198,7 +197,7 @@ export default function PartWorkspace({ partId, live, header, initialMeasure, in
         <button className="btn icon sm" onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.15).toFixed(2)))} aria-label="Alejar"><ZoomOut size={16} /></button>
         <button className="btn sm" style={{ minWidth: 58 }} onClick={() => setZoom(1)} title="Ajustar al ancho">{Math.round(zoom * 100)}%</button>
         <button className="btn icon sm" onClick={() => setZoom((z) => Math.min(3, +(z + 0.15).toFixed(2)))} aria-label="Acercar"><ZoomIn size={16} /></button>
-        <button className="btn icon sm" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : shell.current?.requestFullscreen())} aria-label="Pantalla completa">{fs ? <Minimize size={16} /> : <Maximize size={16} />}</button>
+        <button className="btn icon sm" onClick={() => toggleFullscreen(shell.current ?? undefined)} aria-label="Pantalla completa" title="Pantalla completa">{fs ? <Minimize size={16} /> : <Maximize size={16} />}</button>
         <span className="sep-v" />
         {!toolsOpen && <button className={`btn sm ${tool !== 'none' ? 'on' : ''}`} onClick={() => setToolsOpen(true)} data-testid="open-tools"><PenTool size={15} /> Anotar</button>}
         {toolsOpen && <>

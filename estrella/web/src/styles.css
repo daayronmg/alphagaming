@@ -579,3 +579,10 @@ button.march-row { width: 100%; background: none; border: 0; border-bottom: 1px 
 .solo-play { padding-left: 16px; padding-right: 16px; max-width: 900px; width: 100%; margin: 0 auto; }
 .offline-dl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .offline-dl .xs { display: inline-flex; align-items: center; gap: 4px; }
+/* modo foco (pantalla completa donde el navegador no la permite) */
+html.pseudo-full .topbar, html.pseudo-full .bottom-nav, html.pseudo-full .sidebar, html.pseudo-full .live-banner, html.pseudo-full .urgent-banner { display: none !important; }
+html.pseudo-full .main { margin: 0 !important; }
+/* el original, tal cual: sin marco ni relleno alrededor */
+.live-score.is-original { background: transparent; border: 0; padding: 0; overflow: visible; }
+.live-score.is-original .score-page { margin: 0 auto 12px; }
+.live-score.is-original .page-no, .full-score .page-no { display: none; }
