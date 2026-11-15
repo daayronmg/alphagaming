@@ -394,7 +394,7 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
         const artic = n.artic ?? [];
         // el calderón alarga la nota
         const q = noteQuarters(n) * (artic.includes('fermata') ? 1.8 : 1);
-        const midi = n.rest || !n.step ? null : midiOf(n.step, n.octave!, n.alter ?? 0) + p.doc.transposition;
+        const midi = n.rest || !n.step ? null : midiOf(n.step, n.octave!, n.alter ?? 0) + p.doc.transposition + (p.doc.tuning ?? 0);
         if (n.dyn && DYN[n.dyn] != null) level = DYN[n.dyn];
         // nota ligada a la anterior de la misma altura: se prolonga, no se vuelve a atacar
         if (tied && midi != null && tied.midi === midi) tied.dur += q * secPerQuarter;
