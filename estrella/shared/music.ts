@@ -46,6 +46,11 @@ export interface ScoreDoc {
   tempo: number;
   /** semitonos de lo escrito a lo que suena (corneta en Sib = -2) */
   transposition: number;
+  /**
+   * afinación del instrumento de la grabación de referencia: semitonos que suena por encima de lo normal.
+   * Solo cambia el sonido; las posiciones de llave (| Do, — Reb) siguen siendo las escritas.
+   */
+  tuning?: number;
   measures: Measure[];
 }
 
@@ -206,6 +211,7 @@ export function validateScore(d: any): string | null {
   if (!Array.isArray(d.time) || d.time.length !== 2 || ![1, 2, 4, 8, 16].includes(d.time[1]) || !(d.time[0] >= 1 && d.time[0] <= 16)) return 'Compás no válido';
   if (!(d.tempo >= 20 && d.tempo <= 300)) return 'Tempo fuera de rango (20–300)';
   if (!Number.isInteger(d.transposition) || Math.abs(d.transposition) > 24) return 'Transposición no válida';
+  if (d.tuning != null && (!Number.isInteger(d.tuning) || Math.abs(d.tuning) > 2)) return 'Afinación no válida';
   if (!Array.isArray(d.measures) || d.measures.length > 2000) return 'Lista de compases no válida';
   const ids = new Set<string>();
   for (const m of d.measures) {
