@@ -1,0 +1,145 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1080px;height:1920px;overflow:hidden;background:#101826;font-family:'Inter','Noto Color Emoji',sans-serif}
+#bg{position:absolute;inset:0;background:radial-gradient(circle at 50% 55%,#1f3550 0%,#0c111b 70%)}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;z-index:4}
+svg{position:absolute;left:0;top:0}
+.cap{position:absolute;left:50px;right:50px;top:210px;text-align:center;font-weight:900;font-size:74px;line-height:1.2;color:#fff;z-index:5;text-shadow:0 0 5px #000,0 0 5px #000,0 4px 12px #000}
+.cap .w{display:inline-block;margin:0 8px;opacity:0}
+.cap .hl{color:#FFB38A}
+.bub{position:absolute;background:#fff;color:#111;font-weight:900;font-size:64px;padding:24px 40px;border-radius:40px;opacity:0;z-index:6;max-width:900px;text-align:center;line-height:1.15;font-size:56px}
+.bub:after{content:'';position:absolute;bottom:-28px;left:60px;border:20px solid transparent;border-top:30px solid #fff}
+</style></head><body>
+<div id="bg"></div>
+<svg width="1080" height="1920" viewBox="0 0 1080 1920">
+<defs><linearGradient id="fish" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8FA9C4"/><stop offset=".45" stop-color="#F28C6B"/><stop offset="1" stop-color="#FFD9C7"/></linearGradient>
+<radialGradient id="shine"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+
+<!-- PAN -->
+<g id="pan" opacity="0"><ellipse cx="0" cy="0" rx="330" ry="90" fill="#2a2a2e"/><ellipse cx="0" cy="-12" rx="300" ry="70" fill="#3b3b40"/><rect x="300" y="-22" width="260" height="34" rx="16" fill="#1c1c1f"/>
+ <g id="flames" fill="#FF7A1A"><path d="M-240,70 q30,-90 60,0 z"/><path d="M-120,80 q35,-110 70,0 z"/><path d="M0,85 q35,-120 70,0 z"/><path d="M120,80 q35,-105 70,0 z"/><path d="M220,70 q30,-90 60,0 z"/></g></g>
+
+<!-- DNA -->
+<g id="dna" opacity="0"></g>
+
+<!-- JUANI -->
+<g id="juani" opacity="0">
+ <path d="M-240,560 Q0,380 240,560 L300,920 L-300,920 Z" fill="#7FC8A9"/>
+ <rect x="-50" y="180" width="100" height="160" rx="40" fill="#E9C2A0" class="sk"/>
+ <path d="M-240,-100 Q-240,-380 0,-390 Q240,-380 240,-100 L260,420 Q0,470 -260,420 Z" fill="#B5793F"/>
+ <ellipse cx="-228" cy="-40" rx="34" ry="52" fill="#E9C2A0" class="sk"/><ellipse cx="228" cy="-40" rx="34" ry="52" fill="#E9C2A0" class="sk"/>
+ <circle cx="-228" cy="20" r="16" fill="#F3D27A"/><circle cx="228" cy="20" r="16" fill="#F3D27A"/>
+ <ellipse cx="0" cy="-60" rx="232" ry="275" fill="#E9C2A0" class="sk" id="jhead"/>
+ <ellipse cx="-110" cy="10" rx="70" ry="45" fill="url(#shine)" class="jgl" opacity="0"/><ellipse cx="110" cy="10" rx="70" ry="45" fill="url(#shine)" class="jgl" opacity="0"/>
+ <ellipse cx="-120" cy="40" rx="55" ry="30" fill="#FF8FA3" opacity=".45"/><ellipse cx="120" cy="40" rx="55" ry="30" fill="#FF8FA3" opacity=".45"/>
+ <path d="M-120,-125 q40,-26 80,-6" stroke="#6B4423" stroke-width="12" stroke-linecap="round" fill="none"/><path d="M40,-131 q40,-20 80,6" stroke="#6B4423" stroke-width="12" stroke-linecap="round" fill="none"/>
+ <ellipse cx="-85" cy="-45" rx="46" ry="54" fill="#fff"/><ellipse cx="85" cy="-45" rx="46" ry="54" fill="#fff"/>
+ <circle cx="-80" cy="-38" r="26" fill="#2B1B12" class="jp"/><circle cx="90" cy="-38" r="26" fill="#2B1B12" class="jp"/>
+ <path d="M-130,-95 l-14,-16 M-110,-100 l-8,-20 M130,-95 l14,-16 M110,-100 l8,-20" stroke="#2B1B12" stroke-width="6" stroke-linecap="round"/>
+ <path d="M0,-10 q-12,40 6,48" stroke="#C9A285" stroke-width="7" fill="none" stroke-linecap="round"/>
+ <path id="jmouth" d="M-50,95 Q0,140 50,95" stroke="#C0405A" stroke-width="14" fill="#fff" stroke-linecap="round"/>
+ <path d="M-240,-100 Q-230,-360 0,-370 Q220,-360 240,-120 Q160,-240 20,-260 Q-70,-200 -210,-170 Z" fill="#C98B4E"/>
+ <g id="jspark" fill="#FFE9A8" opacity="0"><path d="M0,-30 L8,-8 L30,0 L8,8 L0,30 L-8,8 L-30,0 L-8,-8 Z" transform="translate(-190,-120)"/><path d="M0,-24 L6,-6 L24,0 L6,6 L0,24 L-6,6 L-24,0 L-6,-6 Z" transform="translate(190,-30)"/><path d="M0,-20 L5,-5 L20,0 L5,5 L0,20 L-5,5 L-20,0 L-5,-5 Z" transform="translate(70,130)"/></g>
+ <g id="phone" opacity="0" transform="translate(150,330) rotate(-10)"><rect x="-70" y="-130" width="140" height="260" rx="22" fill="#111"/><rect x="-60" y="-115" width="120" height="230" rx="14" fill="#25F4EE"/><rect x="-60" y="-115" width="120" height="230" rx="14" fill="#FE2C55" opacity=".5"/></g>
+ <g id="jar" opacity="0" transform="translate(-170,330)"><rect x="-70" y="-60" width="140" height="120" rx="20" fill="#FFB6C8"/><rect x="-76" y="-90" width="152" height="40" rx="12" fill="#F7F7F7"/><text x="-48" y="18" font-family="Inter" font-weight="900" font-size="34" fill="#C2185B">PDRN</text></g>
+</g>
+
+<!-- PACO -->
+<g id="paco" opacity="0">
+ <path d="M-260,560 Q0,380 260,560 L320,920 L-320,920 Z" fill="#3E5C99"/>
+ <rect x="-60" y="180" width="120" height="160" rx="40" fill="#D9A27E"/>
+ <ellipse cx="-238" cy="-40" rx="38" ry="56" fill="#D9A27E"/><ellipse cx="238" cy="-40" rx="38" ry="56" fill="#D9A27E"/>
+ <ellipse cx="0" cy="-60" rx="240" ry="270" fill="#D9A27E"/>
+ <path d="M-235,-60 Q-245,-220 -150,-250 L-160,-120 Z M235,-60 Q245,-220 150,-250 L160,-120 Z" fill="#3a2a22"/>
+ <ellipse cx="-60" cy="-260" rx="70" ry="24" fill="#fff" opacity=".18"/>
+ <path id="pbL" d="M-150,-120 q50,-30 100,-6" stroke="#2a1d16" stroke-width="16" stroke-linecap="round" fill="none"/><path id="pbR" d="M50,-126 q50,-24 100,6" stroke="#2a1d16" stroke-width="16" stroke-linecap="round" fill="none"/>
+ <ellipse id="peL" cx="-90" cy="-45" rx="44" ry="48" fill="#fff"/><ellipse id="peR" cx="90" cy="-45" rx="44" ry="48" fill="#fff"/>
+ <circle id="ppL" cx="-90" cy="-40" r="22" fill="#1b120c"/><circle id="ppR" cx="90" cy="-40" r="22" fill="#1b120c"/>
+ <path d="M0,-10 q-18,55 10,64" stroke="#B9846A" stroke-width="9" fill="none" stroke-linecap="round"/>
+ <path d="M-120,90 Q-60,40 0,70 Q60,40 120,90 Q60,80 0,95 Q-60,80 -120,90 Z" fill="#2a1d16"/>
+ <ellipse id="pmouth" cx="0" cy="140" rx="40" ry="8" fill="#5a1f1f"/>
+ <g id="pjar" opacity="0" transform="translate(190,330)"><rect x="-70" y="-60" width="140" height="120" rx="20" fill="#FFB6C8"/><rect x="-76" y="-90" width="152" height="40" rx="12" fill="#F7F7F7"/><text x="-48" y="18" font-family="Inter" font-weight="900" font-size="34" fill="#C2185B">PDRN</text></g>
+</g>
+
+<!-- CAJERA -->
+<g id="caj" opacity="0">
+ <path d="M-200,460 Q0,320 200,460 L250,760 L-250,760 Z" fill="#2E8B57"/>
+ <ellipse cx="0" cy="-20" rx="190" ry="220" fill="#F1C9A5"/>
+ <path d="M-190,-40 Q-190,-260 0,-265 Q190,-260 190,-40 Q120,-170 0,-180 Q-120,-170 -190,-40 Z" fill="#222"/>
+ <ellipse cx="-70" cy="-20" rx="36" ry="42" fill="#fff"/><ellipse cx="70" cy="-20" rx="36" ry="42" fill="#fff"/>
+ <circle cx="-70" cy="-15" r="18" fill="#222"/><circle cx="70" cy="-15" r="18" fill="#222"/>
+ <path d="M-110,-75 q40,-10 70,6 M40,-69 q40,-16 70,-6" stroke="#222" stroke-width="10" stroke-linecap="round" fill="none"/>
+ <path d="M-40,100 q40,-20 80,0" stroke="#A33" stroke-width="10" fill="none" stroke-linecap="round"/>
+</g>
+
+<!-- SALMON -->
+<g id="salmon" opacity="0">
+ <path id="tail" d="M-260,0 L-360,-90 L-340,0 L-360,90 Z" fill="#E8775A"/>
+ <path d="M-270,0 Q-150,-150 120,-110 Q280,-80 300,0 Q280,80 120,110 Q-150,150 -270,0 Z" fill="url(#fish)"/>
+ <path d="M-40,-120 Q20,-210 90,-115 Z" fill="#7F97B3"/><path d="M0,100 Q40,170 80,105 Z" fill="#E8775A"/>
+ <g fill="#5c6f85"><circle cx="-120" cy="-50" r="7"/><circle cx="-60" cy="-70" r="7"/><circle cx="0" cy="-60" r="7"/><circle cx="-90" cy="-20" r="6"/><circle cx="40" cy="-80" r="6"/></g>
+ <path d="M150,-95 Q120,0 150,95" stroke="#D96A50" stroke-width="7" fill="none"/>
+ <circle cx="220" cy="-30" r="22" fill="#fff"/><circle id="feye" cx="225" cy="-28" r="12" fill="#111"/>
+ <g id="glasses"><rect x="170" y="-62" width="110" height="52" rx="18" fill="#111"/><rect x="120" y="-48" width="60" height="10" fill="#111"/><path d="M190,-52 l24,0" stroke="#555" stroke-width="6"/></g>
+ <path id="fmouth" d="M275,30 q12,10 24,0" stroke="#8a3a2a" stroke-width="6" fill="none" stroke-linecap="round"/>
+ <g id="sweat" fill="#8fd3ff" opacity="0"><path d="M120,-150 q14,24 0,34 q-14,-10 0,-34z"/><path d="M60,-170 q12,20 0,30 q-12,-10 0,-30z"/></g>
+ <g id="fjar" opacity="0" transform="translate(40,150)"><rect x="-70" y="-60" width="140" height="120" rx="20" fill="#FFB6C8"/><rect x="-76" y="-90" width="152" height="40" rx="12" fill="#F7F7F7"/><text x="-48" y="18" font-family="Inter" font-weight="900" font-size="34" fill="#C2185B">PDRN</text></g>
+</g>
+
+<!-- BIG PRODUCT -->
+<g id="prod" opacity="0"><rect x="-190" y="-160" width="380" height="320" rx="50" fill="#FFB6C8"/><rect x="-205" y="-235" width="410" height="100" rx="30" fill="#F7F7F7"/>
+ <text x="-130" y="10" font-family="Inter" font-weight="900" font-size="92" fill="#C2185B">PDRN</text><text x="-120" y="80" font-family="Inter" font-weight="700" font-size="40" fill="#C2185B">pink collagen</text></g>
+</svg>
+<div id="flash"></div>
+<div class="cap" id="cap"></div>
+<div class="bub" id="bub"></div>
+<script>
+const NS='http://www.w3.org/2000/svg',$=id=>document.getElementById(id);
+const dna=$('dna');for(let i=0;i<22;i++){['a','b'].forEach(k=>{const c=document.createElementNS(NS,'circle');c.setAttribute('r',16);c.setAttribute('fill',k=='a'?'#FF8FB1':'#7FD1FF');c.dataset.i=i;c.dataset.k=k;dna.appendChild(c)});const l=document.createElementNS(NS,'line');l.setAttribute('stroke','#fff');l.setAttribute('stroke-opacity','.5');l.setAttribute('stroke-width',5);l.dataset.i=i;l.dataset.k='l';dna.appendChild(l)}
+const S=[
+ {s:0,e:4,cap:['que','un','*salmón','me','eche','su','*lechita','en','la','cara','🐟']},
+ {s:4,e:5.5,cap:['sí,','sí,','escucha']},
+ {s:5.5,e:9,cap:['esto','lo','descubrió','mi','*Juani','📱']},
+ {s:9,e:13,cap:['Juani,','¿qué','te','*echas?']},
+ {s:13,e:15.5,cap:['*SEMEN','*DE','*SALMÓN,','PACO']},
+ {s:15.5,e:19,cap:['¡que','yo','al','salmón','lo','conocía','de','la','*plancha!']},
+ {s:19,e:25.5,cap:['PDRN:','lo','que','se','pinchan','las','*coreanas','✨']},
+ {s:25.5,e:32,cap:['y','la','cajera','del','súper','le','pide','el','*DNI','💀']},
+ {s:32,e:35.5,cap:['el','salmón','no','*distingue,','picha']},
+ {s:35.5,e:41,cap:['en','la','cesta','🛒','antes','de','que','se','acabe','el','*salmón']}];
+const cl=x=>x<0?0:x>1?1:x,ease=x=>{x=cl(x);return 1-Math.pow(1-x,3)},back=x=>{x=cl(x);const c=1.7;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)},lerp=(a,b,k)=>a+(b-a)*k;
+function setCap(sc,t){const c=$('cap');if(c.dataset.k!=sc.s){c.dataset.k=sc.s;c.innerHTML=sc.cap.map(w=>w[0]=='*'?`<span class="w"><span class="hl">${w.slice(1)}</span></span>`:`<span class="w">${w}</span>`).join(' ')}
+ [...c.children].forEach((el,i)=>{const k=back((t-sc.s-0.08*i)/.25);el.style.opacity=cl((t-sc.s-0.08*i)/.15);el.style.transform=`scale(${Math.max(0,k)})`})}
+function tf(id,x,y,s,r=0,o=1,fx=1){const g=$(id);g.setAttribute('transform',`translate(${x},${y}) rotate(${r}) scale(${s*fx},${s})`);g.setAttribute('opacity',o)}
+function bub(txt,x,y,t,t0,t1){const b=$('bub');b.textContent=txt;b.style.left=x+'px';b.style.top=y+'px';b.style.opacity=t>=t0&&t<t1?cl((t-t0)/.15):0;b.style.transform=`scale(${Math.max(0,back((t-t0)/.3))})`}
+window.render=function(t){
+ const sc=S.find(x=>t>=x.s&&t<x.e)||S[S.length-1];setCap(sc,t);
+ ['juani','paco','caj','salmon','pan','dna','prod'].forEach(i=>$(i).setAttribute('opacity',0));$('bub').style.opacity=0;$('flash').style.opacity=0;
+ ['phone','jar','pjar','fjar','sweat','jspark'].forEach(i=>$(i).setAttribute('opacity',0));
+ const sw=Math.sin(t*5)*6, bob=Math.sin(t*2.5)*12;
+ $('tail').setAttribute('transform',`rotate(${Math.sin(t*10)*12} -260 0)`);
+ // paco expression default
+ let shock=0;
+ if(sc.s==0){tf('paco',540,1180,.95,Math.sin(t*1.2)*2);const k=ease((t-.3)/.8);tf("salmon",lerp(1400,560,k),640+bob,.9,sw)}
+ else if(sc.s==4){tf('paco',540,1180,.95,0);tf("salmon",560,640+bob,.9,sw);bub("¿?",760,520,t,4.2,5.5)}
+ else if(sc.s==5.5){const k=ease((t-5.5)/.5);tf('juani',lerp(1500,540,k),1200,.95,0);$('phone').setAttribute('opacity',1);$('phone').setAttribute('transform',`translate(150,330) rotate(${-10+Math.sin(t*8)*4})`)}
+ else if(sc.s==9){tf('juani',540,1200,.95,0);$('jar').setAttribute('opacity',1);tf('paco',lerp(-500,170,ease((t-9.2)/.6)),1500,.6,0);bub('Juani, ¿qué te echas?',260,1050,t,10,13)}
+ else if(sc.s==13){shock=1;tf('paco',540,1180,1+0.35*ease((t-13)/.4),Math.sin(t*40)*2*cl((t-13)/.3));$('flash').style.opacity=t<13.25?0.85*(1-(t-13)/.25):0}
+ else if(sc.s==15.5){shock=.6;tf('pan',540,1350,1,0);const fl=$('flames');fl.setAttribute('transform',`scale(1,${1+Math.sin(t*12)*.12})`);tf('salmon',540,1180+Math.abs(Math.sin(t*6))*-60,.85,Math.sin(t*12)*8);$('sweat').setAttribute('opacity',1);$('glasses').setAttribute('opacity',0)}
+ else if(sc.s==19){$('glasses').setAttribute('opacity',1);const o=ease((t-19)/.5);dna.setAttribute('opacity',o);
+   [...dna.children].forEach(el=>{const i=+el.dataset.i,y=600+i*48,ph=t*3+i*.45,xa=540+Math.sin(ph)*220,xb=540-Math.sin(ph)*220;
+    if(el.dataset.k=='a'){el.setAttribute('cx',xa);el.setAttribute('cy',y)}else if(el.dataset.k=='b'){el.setAttribute('cx',xb);el.setAttribute('cy',y)}else{el.setAttribute('x1',xa);el.setAttribute('x2',xb);el.setAttribute('y1',y);el.setAttribute('y2',y)}});
+   bub("más brillo que un Seat Ibiza recién lavao",110,1640,t,22,25.5)}
+ else if(sc.s==25.5){tf('juani',300,1250,.75,0);$('jspark').setAttribute('opacity',1);document.querySelectorAll('.jgl').forEach(e=>e.setAttribute('opacity',.85));
+   tf('caj',lerp(1500,820,ease((t-25.8)/.6)),1300,.75,0);bub("¿me enseñas el DNI?",520,860,t,27.5,32)}
+ else if(sc.s==32){tf('paco',540,1180,.95,0);$('pjar').setAttribute('opacity',1);tf('salmon',lerp(1400,780,ease((t-32.6)/.6)),760+bob,.6,sw,-1)}
+ else {const k=back((t-35.5)/.6);tf('prod',540,1050,1.3*Math.max(0,k),Math.sin(t*2)*3);const k2=ease((t-38)/2);tf('salmon',lerp(1300,-500,k2),1500+bob,.7,sw,-1)}
+ if(sc.s!=25.5)document.querySelectorAll('.jgl').forEach(e=>e.setAttribute('opacity',0));
+ if(sc.s!=15.5)$('glasses').setAttribute('opacity',1);
+ // paco face
+ $('pmouth').setAttribute('ry',lerp(8+(sc.s==0||sc.s==32?Math.abs(Math.sin(t*9))*14:0),70,shock));$('pmouth').setAttribute('rx',lerp(40,55,shock));
+ ['peL','peR'].forEach(i=>{$(i).setAttribute('ry',lerp(48,70,shock));$(i).setAttribute('rx',lerp(44,58,shock))});['ppL','ppR'].forEach(i=>$(i).setAttribute('r',lerp(22,12,shock)));
+ $('pbL').setAttribute('transform',`translate(0,${-40*shock})`);$('pbR').setAttribute('transform',`translate(0,${-40*shock})`);
+};
+render(0);
+</script></body></html>
