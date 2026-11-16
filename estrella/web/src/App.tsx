@@ -36,6 +36,7 @@ const Inventory = lazy(() => import('./pages/Inventory'));
 const Admin = lazy(() => import('./pages/Admin'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const Checkin = lazy(() => import('./pages/Checkin'));
+const AchievementsPage = lazy(() => import('./pages/Achievements'));
 
 function UpdatePrompt() {
   const { needRefresh: [need], updateServiceWorker } = useRegisterSW({ onRegisteredSW() {} });
@@ -100,6 +101,7 @@ export default function App() {
             <Route path="inventario" element={<Inventory />} />
             <Route path="admin" element={<Admin />} />
             <Route path="ajustes" element={<SettingsPage />} />
+            <Route path="logros" element={<AchievementsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth';
 import { useLoad, Spinner, ErrorBox, Field, Notice, Modal, useToast } from '../components/ui';
 import { initials, assignmentLabel, fmtDate, fmtDateTime } from '../lib/format';
 import { AssignmentEditor } from './Members';
+import { AchievementGrid, useAchievements } from '../components/Achievements';
 import { fileUrl } from '../lib/api';
 
 export default function MemberDetail() {
@@ -13,6 +14,7 @@ export default function MemberDetail() {
   const { can, catalog, me } = useAuth();
   const toast = useToast();
   const m = useLoad(() => get(`/members/${id}`), [id]);
+  const ach = useAchievements(id);
   const [assign, setAssign] = useState<any[] | null>(null);
   const [link, setLink] = useState<string | null>(null);
   if (m.error) return <div className="page"><ErrorBox error={m.error} /></div>;
@@ -60,6 +62,13 @@ export default function MemberDetail() {
             {x.courses?.map((c: any) => <div key={c.title} className="stack sm"><div className="row between small"><span>{c.title}</span><span>{c.done}/{c.lessons}</span></div><div className="bar"><i style={{ width: `${c.lessons ? c.done / c.lessons * 100 : 0}%` }} /></div></div>)}
             {x.repertoire?.length > 0 && <p className="small muted">Marchas consultadas: {x.repertoire.map((r: any) => r.title).join(', ')}</p>}
             <p className="xs faint">Datos de actividad en la app. No valoran la calidad musical.</p>
+          </div>
+        )}
+
+        {ach.data && (
+          <div className="card stack">
+            <div className="card-title"><h3>Logros</h3><span className="xs faint">{ach.data.medals} de {ach.data.total} medallas</span></div>
+            <AchievementGrid set={ach.data} />
           </div>
         )}
 
