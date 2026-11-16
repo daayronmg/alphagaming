@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   Home, CalendarDays, Library, Radio, Megaphone, MessageCircleQuestion, GraduationCap, Bot, Users, BarChart3,
-  Settings, Shield, Package, LogOut, Moon, Sun, Wifi, WifiOff, RefreshCw, Siren, CloudUpload, Baton, Music, Bell, UserRound,
+  Settings, Shield, Package, LogOut, Moon, Sun, Wifi, WifiOff, RefreshCw, Siren, CloudUpload, Baton, Music, Bell, UserRound, Trophy,
 } from './icons';
 import { useAuth } from '../lib/auth';
 import { rt, useConn, useRealtime } from '../lib/realtime';
@@ -114,6 +114,7 @@ export default function Layout() {
     { to: '/estadisticas', label: 'Estadísticas', icon: <BarChart3 size={19} />, show: can('stats.view') || canSection('attendance'), group: 'Dirección' },
     { to: '/inventario', label: 'Material y uniformidad', icon: <Package size={19} />, group: 'Dirección', show: isStaff },
     { to: '/admin', label: 'Administración', icon: <Shield size={19} />, show: me.role === 'director' || can('assignments.manage'), group: 'Dirección' },
+    { to: '/logros', label: 'Mis logros', icon: <Trophy size={19} />, group: 'Personal' },
     { to: '/ajustes', label: 'Mi cuenta', icon: <Settings size={19} />, group: 'Personal' },
   ];
   const visible = links.filter((l) => l.show !== false);

@@ -492,3 +492,25 @@ test('modo músico: solo quien tiene el permiso cambia de modo y, en modo músic
   assert.equal((await e2('/auth/me')).data.user.role, 'director');
   await pool.query(`update users set permissions = array_remove(permissions, 'mode.switch') where email = 'emilio@estrella.demo'`);
 });
+
+test('logros: se ganan con la asistencia oficial y la dirección los ve; un componente no ve los de otro', async () => {
+  const a = await login('componente.a@estrella.demo');
+  const me = (await a('/logros')).data;
+  assert.ok(me.items.length >= 10);
+  const uid = me.user.id;
+  // cinco procesiones pasadas con asistencia oficial: bronce en asistencia no (10), pero sí «Detrás del paso» plata (5)
+  for (let i = 1; i <= 5; i++) {
+    const ev = (await pool.query(`insert into events(type, title, starts_at) values ('procesion', 'Procesión prueba ${i}', now() - interval '${i} days') returning id`)).rows[0].id;
+    await pool.query(`insert into attendance(event_id, user_id, status) values ($1, $2, 'presente')`, [ev, uid]);
+  }
+  const after = (await a('/logros')).data;
+  const pro = after.items.find((x: any) => x.id === 'procesion');
+  assert.equal(pro.value, 5); assert.equal(pro.tier, 'Plata'); assert.equal(pro.tierNext, 'Oro');
+  const racha = after.items.find((x: any) => x.id === 'racha');
+  assert.ok(racha.value >= 5); assert.ok(['Bronce', 'Plata'].includes(racha.tier));
+  assert.ok(after.medals > me.medals);
+  const emilio = await login('emilio@estrella.demo');
+  assert.equal((await emilio(`/logros/${uid}`)).status, 200);
+  const b = await login('componente.b@estrella.demo');
+  assert.equal((await b(`/logros/${uid}`)).status, 403);
+});

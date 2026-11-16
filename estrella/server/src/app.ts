@@ -12,6 +12,7 @@ import { privacyGuard } from './lib/privacy.ts';
 import { errorHandler } from './lib/http.ts';
 import { authRouter } from './routes/auth.ts';
 import { passkeyRouter } from './routes/passkeys.ts';
+import { achievementsRouter } from './routes/achievements.ts';
 import { orgRouter } from './routes/org.ts';
 import { membersRouter } from './routes/members.ts';
 import { libraryRouter } from './routes/library.ts';
@@ -72,6 +73,7 @@ export function createApp() {
   app.use('/api/assistant', assistantRouter);
   app.use('/api/stats', statsRouter);
   app.use('/api/inventory', inventoryRouter);
+  app.use('/api/logros', achievementsRouter);
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
 
   // Interfaz compilada (producción): un solo servidor para API, WebSocket y PWA

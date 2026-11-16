@@ -590,3 +590,33 @@ html.pseudo-full .main { margin: 0 !important; }
 .live-score.is-original .page-no, .full-score .page-no { display: none; }
 /* el botón de reproducir nunca se aplasta: los demás se desplazan de lado si no caben */
 .live-play-btn { flex: 1 0 auto; min-width: 128px; }
+
+/* ===== Logros ===== */
+.ach-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.ach { display: flex; gap: 14px; align-items: flex-start; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+.ach-medal { position: relative; flex: none; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), 0 0 0 3px var(--surface), 0 0 0 4px var(--line-2); }
+.ach.bronze .ach-medal { background: radial-gradient(circle at 35% 30%, #e7a76c, #a0592b 70%); }
+.ach.silver .ach-medal { background: radial-gradient(circle at 35% 30%, #f1f3f5, #8f99a3 72%); color: #2b3138; }
+.ach.gold .ach-medal { background: radial-gradient(circle at 35% 30%, #ffe08a, #c9992b 70%); color: #5a3d00; box-shadow: inset 0 -3px 0 rgba(0,0,0,.15), 0 0 0 3px var(--surface), 0 0 0 4px var(--gold), 0 4px 14px rgba(201,153,43,.35); }
+.ach.locked .ach-medal { background: var(--surface-2); color: var(--text-3); box-shadow: inset 0 0 0 2px var(--line-2); }
+.ach-lock { position: absolute; right: -2px; bottom: -2px; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); color: var(--text-3); display: grid; place-items: center; box-shadow: 0 0 0 1px var(--line-2); }
+.ach-body { min-width: 0; flex: 1; display: grid; gap: 4px; }
+.ach-head { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.ach-tier { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; }
+.ach.bronze .ach-tier { background: #f6e3d3; color: #7a3f17; }
+.ach.silver .ach-tier { background: #e9edf1; color: #39424b; }
+.ach.gold .ach-tier { background: #fbf0cf; color: #6b4a00; }
+.ach-bar { margin-top: 4px; height: 6px; }
+.ach.locked .ach-bar > i, .ach-bar > i { background: var(--accent); }
+.ach-card { display: flex; align-items: center; gap: 14px; text-decoration: none; color: inherit; }
+.ach-card-icon, .ach-trophy { flex: none; width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: #fbf0cf; color: #8a6200; }
+.ach-trophy { width: 64px; height: 64px; border-radius: 18px; }
+.ach-mini { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.ach-mini:empty { display: none; }
+.ach-dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: #fff; }
+.ach-dot.bronze { background: #b06a37; } .ach-dot.silver { background: #9aa3ac; } .ach-dot.gold { background: #c9992b; }
+.ach-summary { display: flex; align-items: center; gap: 16px; }
+.ach-count strong { font-size: 2rem; font-weight: 800; letter-spacing: -.02em; }
+:root[data-theme="dark"] .ach.bronze .ach-tier, :root[data-theme="dark"] .ach.silver .ach-tier, :root[data-theme="dark"] .ach.gold .ach-tier { background: var(--surface-2); color: var(--text); }
+:root[data-theme="dark"] .ach-card-icon, :root[data-theme="dark"] .ach-trophy { background: rgba(201,153,43,.18); color: var(--gold-2); }

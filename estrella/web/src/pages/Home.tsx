@@ -8,6 +8,7 @@ import { useLoad, Notice, useToast, Modal, Field } from '../components/ui';
 import { fmtTime, EVENT_TYPES, assignmentLabel, fmtRelative } from '../lib/format';
 import { useRealtime } from '../lib/realtime';
 import { OfflineDownload } from '../components/OfflineDownload';
+import { AchievementsCard } from '../components/Achievements';
 
 const REASONS = ['Trabajo', 'Estoy enfermo/a', 'Estudios', 'Viaje', 'Asunto familiar'];
 
@@ -113,6 +114,8 @@ export default function Home() {
       ) : (
         <div className="card"><div className="row"><CalendarDays size={20} className="faint" /><span className="muted">No hay ensayos próximos.</span></div></div>
       )}
+
+      <AchievementsCard />
 
       {/* 3. Elegir una marcha y tocar */}
       <div className="card stack">
