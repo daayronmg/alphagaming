@@ -1,0 +1,154 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1080px;height:1920px;overflow:hidden;background:#0A0A0E;font-family:'Inter','Noto Color Emoji',sans-serif}
+#st{position:absolute;inset:0;overflow:hidden}
+.glow{position:absolute;width:1400px;height:1400px;left:-160px;top:300px;border-radius:50%;background:radial-gradient(rgba(243,200,90,.30),transparent 60%)}
+svg{position:absolute;left:0;top:0}
+.cap{position:absolute;left:50px;right:50px;top:200px;text-align:center;font-weight:800;font-size:80px;line-height:1.18;color:#fff;letter-spacing:-1px;z-index:5}
+.cap .w{display:inline-block;margin:0 9px;opacity:0}
+.cap .hl{background:#F3D27A;color:#111;padding:0 14px;border-radius:14px}
+.badge{position:absolute;background:#fff;color:#111;font-weight:800;font-size:46px;padding:20px 34px;border-radius:60px;box-shadow:0 12px 40px rgba(0,0,0,.5);opacity:0;white-space:nowrap;z-index:6}
+.gold{background:#F3D27A}
+.pill{position:absolute;left:50%;font-weight:900;font-size:56px;padding:22px 44px;border-radius:24px;white-space:nowrap;opacity:0;z-index:6}
+.big{position:absolute;left:0;right:0;text-align:center;color:#fff;font-weight:900;opacity:0;z-index:6}
+</style></head><body><div id="st">
+<div class="glow" id="glow"></div>
+<svg width="1080" height="1920" viewBox="0 0 1080 1920">
+<defs>
+ <linearGradient id="glass" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".25" stop-color="#fff" stop-opacity=".08"/><stop offset=".8" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#fff" stop-opacity=".3"/></linearGradient>
+ <linearGradient id="liq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF4D6" stop-opacity=".55"/><stop offset="1" stop-color="#F3D27A" stop-opacity=".55"/></linearGradient>
+ <linearGradient id="capg" x1="0" x2="1"><stop offset="0" stop-color="#8d8d95"/><stop offset=".45" stop-color="#e9e9ef"/><stop offset="1" stop-color="#7a7a82"/></linearGradient>
+ <clipPath id="bclip"><path d="M-50,-110 L50,-110 L60,-80 Q150,-60 150,0 L150,260 Q150,300 110,300 L-110,300 Q-150,300 -150,260 L-150,0 Q-150,-60 -60,-80 Z"/></clipPath>
+ <clipPath id="sclip"><rect x="-26" y="-230" width="52" height="300" rx="10"/></clipPath>
+ <radialGradient id="shine"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+</defs>
+
+<!-- WOMAN -->
+<g id="woman">
+ <path d="M300,1560 Q540,1380 780,1560 L840,1920 L240,1920 Z" fill="#E9A6B8"/>
+ <rect x="490" y="1180" width="100" height="160" rx="40" id="neck" fill="#E2BFA0"/>
+ <path id="hairback" d="M300,900 Q300,620 540,610 Q780,620 780,900 L800,1420 Q540,1470 280,1420 Z" fill="#5A3A26"/>
+ <ellipse id="earL" cx="312" cy="960" rx="34" ry="52" fill="#E2BFA0"/>
+ <ellipse id="earR" cx="768" cy="960" rx="34" ry="52" fill="#E2BFA0"/>
+ <ellipse id="head" cx="540" cy="940" rx="232" ry="275" fill="#E2BFA0"/>
+ <ellipse id="hl" cx="430" cy="1010" rx="70" ry="45" fill="url(#shine)" opacity="0"/>
+ <ellipse id="hl2" cx="650" cy="1010" rx="70" ry="45" fill="url(#shine)" opacity="0"/>
+ <g id="dry" stroke="#C9A98C" stroke-width="5" stroke-linecap="round" fill="none">
+  <path d="M390,1030 l25,-8 M400,1055 l30,-6 M620,1035 l28,-6 M640,1062 l24,-8 M520,860 l30,0 M545,880 l20,0"/></g>
+ <ellipse id="blL" cx="420" cy="1040" rx="58" ry="32" fill="#FF8FA3" opacity="0"/>
+ <ellipse id="blR" cx="660" cy="1040" rx="58" ry="32" fill="#FF8FA3" opacity="0"/>
+ <path d="M420,880 q40,-26 80,-6" stroke="#4A2E1E" stroke-width="12" stroke-linecap="round" fill="none" id="browL"/>
+ <path d="M580,874 q40,-20 80,6" stroke="#4A2E1E" stroke-width="12" stroke-linecap="round" fill="none" id="browR"/>
+ <g id="eyes">
+  <ellipse cx="455" cy="955" rx="46" ry="54" fill="#fff"/><ellipse cx="625" cy="955" rx="46" ry="54" fill="#fff"/>
+  <circle id="pL" cx="460" cy="962" r="26" fill="#2B1B12"/><circle id="pR" cx="630" cy="962" r="26" fill="#2B1B12"/>
+  <circle cx="470" cy="950" r="9" fill="#fff"/><circle cx="640" cy="950" r="9" fill="#fff"/>
+  <rect id="lidL" x="405" y="895" width="100" height="0" fill="#E2BFA0"/><rect id="lidR" x="575" y="895" width="100" height="0" fill="#E2BFA0"/>
+ </g>
+ <path d="M540,990 q-12,40 6,48" stroke="#C9A285" stroke-width="7" fill="none" stroke-linecap="round"/>
+ <path id="mouth" d="M500,1100 Q540,1080 580,1100" stroke="#B4535F" stroke-width="12" fill="none" stroke-linecap="round"/>
+ <path id="hairfront" d="M300,900 Q310,640 540,630 Q760,640 780,880 Q700,760 560,740 Q470,800 330,830 Z" fill="#6B4630"/>
+ <g id="spark" fill="#FFE9A8" opacity="0">
+  <path id="s1" d="M0,-30 L8,-8 L30,0 L8,8 L0,30 L-8,8 L-30,0 L-8,-8 Z" transform="translate(360,880)"/>
+  <path id="s2" d="M0,-24 L6,-6 L24,0 L6,6 L0,24 L-6,6 L-24,0 L-6,-6 Z" transform="translate(720,960)"/>
+  <path id="s3" d="M0,-20 L5,-5 L20,0 L5,5 L0,20 L-5,5 L-20,0 L-5,-5 Z" transform="translate(600,1110)"/>
+  <path id="s4" d="M0,-26 L7,-7 L26,0 L7,7 L0,26 L-7,7 L-26,0 L-7,-7 Z" transform="translate(470,1150)"/>
+ </g>
+</g>
+
+<!-- AMPOULE -->
+<g id="amp">
+ <rect x="-60" y="-200" width="120" height="70" rx="12" fill="url(#capg)"/>
+ <rect x="-50" y="-135" width="100" height="30" fill="#ddd" opacity=".5"/>
+ <path d="M-50,-110 L50,-110 L60,-80 Q150,-60 150,0 L150,260 Q150,300 110,300 L-110,300 Q-150,300 -150,260 L-150,0 Q-150,-60 -60,-80 Z" fill="url(#liq)" stroke="#fff" stroke-opacity=".6" stroke-width="4"/>
+ <g clip-path="url(#bclip)" id="threads" stroke="#D9A520" stroke-width="5" fill="none" stroke-linecap="round" opacity=".9"></g>
+ <path d="M-50,-110 L50,-110 L60,-80 Q150,-60 150,0 L150,260 Q150,300 110,300 L-110,300 Q-150,300 -150,260 L-150,0 Q-150,-60 -60,-80 Z" fill="url(#glass)"/>
+ <rect x="-130" y="40" width="260" height="190" fill="#fff"/>
+ <text x="-112" y="92" font-family="Georgia,serif" font-weight="700" font-size="34" fill="#111">Deep Collagen</text>
+ <text x="-112" y="128" font-family="Inter" font-size="20" fill="#333">Silk Peptide</text>
+ <text x="-112" y="152" font-family="Inter" font-size="20" fill="#333">Intensive Ampoule</text>
+ <rect x="-112" y="166" width="62" height="32" rx="4" fill="#F3D27A"/><text x="-104" y="190" font-family="Inter" font-weight="700" font-size="20" fill="#111">SILK</text>
+</g>
+
+<!-- SYRINGE -->
+<g id="syr">
+ <rect x="-8" y="70" width="16" height="70" rx="6" fill="#e8e8ee" opacity=".9"/>
+ <g clip-path="url(#sclip)"><rect id="sliq" x="-26" y="70" width="52" height="0" fill="url(#liq)"/><g id="sfleck" fill="#D9A520"></g></g>
+ <rect x="-26" y="-230" width="52" height="300" rx="10" fill="url(#glass)" stroke="#fff" stroke-opacity=".7" stroke-width="3"/>
+ <rect x="-50" y="-240" width="100" height="14" rx="6" fill="#ddd"/>
+ <g id="plunger"><rect x="-9" y="-330" width="18" height="300" fill="#e8e8ee" opacity=".85"/><rect x="-22" y="-60" width="44" height="22" rx="4" fill="#222"/><rect x="-40" y="-342" width="80" height="14" rx="6" fill="#e8e8ee"/></g>
+</g>
+<g id="drops" fill="#FFE7A0"></g>
+</svg>
+<div class="cap" id="cap"></div>
+<div class="badge" id="b1"></div><div class="badge" id="b2"></div><div class="badge" id="b3"></div>
+<div class="big" id="count" style="top:1450px;font-size:160px;color:#F3D27A"></div>
+<div class="big" id="sub" style="top:1630px;font-size:58px"></div>
+<div class="pill" id="p1" style="background:#fff;color:#111;top:1430px"></div>
+<div class="pill" id="p2" style="background:#FE2C55;color:#fff;top:1590px"></div>
+</div>
+<script>
+const NS='http://www.w3.org/2000/svg',$=id=>document.getElementById(id);
+// gold threads
+const th=$('threads');for(let i=0;i<14;i++){const p=document.createElementNS(NS,'path');p.dataset.i=i;th.appendChild(p)}
+const sf=$('sfleck');for(let i=0;i<8;i++){const r=document.createElementNS(NS,'rect');r.setAttribute('width',10);r.setAttribute('height',4);sf.appendChild(r)}
+const dr=$('drops');for(let i=0;i<3;i++){const c=document.createElementNS(NS,'ellipse');c.setAttribute('rx',14);c.setAttribute('ry',20);dr.appendChild(c)}
+const S=[
+ {s:0,e:3,cap:['Así','acaba','tu','piel','en','*invierno:']},
+ {s:3,e:6,cap:['Hasta','que','llega','*esto']},
+ {s:6,e:9,cap:['Coges','unas','*gotas']},
+ {s:9,e:12.5,cap:['Te','la','*aplicas…']},
+ {s:12.5,e:16,cap:['y','tu','piel,','*jugosa','y','con','*glow','✨']},
+ {s:16,e:18.5,cap:['Y','ya','van…']},
+ {s:18.5,e:23,cap:['Por','*Black','*Friday']}];
+const cl=x=>x<0?0:x>1?1:x, ease=x=>{x=cl(x);return 1-Math.pow(1-x,3)}, back=x=>{x=cl(x);const c=1.7;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
+const lerp=(a,b,k)=>a+(b-a)*k;
+const mix=(c1,c2,k)=>{const h=s=>[1,3,5].map(i=>parseInt(s.substr(i,2),16));const a=h(c1),b=h(c2);return 'rgb('+a.map((v,i)=>Math.round(lerp(v,b[i],k))).join(',')+')'};
+function setCap(sc,t){const c=$('cap');if(c.dataset.k!=sc.s){c.dataset.k=sc.s;c.innerHTML=sc.cap.map(w=>w[0]=='*'?`<span class="w"><span class="hl">${w.slice(1)}</span></span>`:`<span class="w">${w}</span>`).join(' ')}
+ [...c.children].forEach((el,i)=>{const k=ease((t-sc.s-0.12*i)/.3);el.style.opacity=k;el.style.transform=`translateY(${(1-k)*30}px)`})}
+function badge(id,txt,cls,x,y,t,t0,t1){const b=$(id);b.textContent=txt;b.className='badge '+cls;const k=back((t-t0)/.35),o=t>t1?1-ease((t-t1)/.25):1;b.style.opacity=cl((t-t0)/.2)*o;b.style.left=x+'px';b.style.top=y+'px';b.style.transform=`scale(${Math.max(0,k)})`}
+function tf(id,x,y,s,r=0,o=1){const g=$(id);g.setAttribute('transform',`translate(${x},${y}) rotate(${r}) scale(${s})`);g.setAttribute('opacity',o)}
+window.render=function(t){
+ const sc=S.find(x=>t>=x.s&&t<x.e)||S[S.length-1];setCap(sc,t);
+ ['b1','b2','b3','count','sub','p1','p2'].forEach(i=>$(i).style.opacity=0);
+ // threads swirl
+ [...th.children].forEach(p=>{const i=+p.dataset.i,y=-90+i*28,ph=t*2+i;p.setAttribute('d',`M-140,${y+Math.sin(ph)*14} C-60,${y-40+Math.cos(ph)*20} 20,${y+40+Math.sin(ph*1.3)*20} 140,${y+Math.cos(ph)*14}`)});
+ // defaults
+ let W={x:0,y:0,s:1,o:1}, A={x:540,y:1000,s:0,r:0,o:0}, Y={x:900,y:900,s:1,r:0,o:0};
+ let glowK=0, fill=0, drops=[];
+ const fl=Math.sin(t*2.2)*10;
+ if(sc.s==0){W.s=1;badge('b1','😩 Tirante y apagada','',260,1400,t,1.6,2.8)}
+ else if(sc.s==3){const k=ease((t-3)/.6);W={x:-700*k,y:0,s:1,o:1-k};A={x:540,y:1000+fl,s:1.5*back((t-3.2)/.6),r:Math.sin(t*1.5)*4,o:1}}
+ else if(sc.s==6){W.o=0;A={x:540,y:1240,s:1.3,r:0,o:1};const k=ease((t-6)/.7);Y={x:540,y:lerp(500,890,k),s:1.2,r:0,o:1};fill=ease((t-6.9)/1.6)}
+ else if(sc.s==9){const k=ease((t-9)/.5);A={x:lerp(540,-300,k),y:1240,s:1.3,r:0,o:1-k};W={x:lerp(700,0,k),y:0,s:1,o:k};fill=1-ease((t-10)/2);
+   Y={x:lerp(540,820,k),y:lerp(890,760,k),s:1.1,r:lerp(0,28,k),o:1};
+   drops=[10,10.6,11.2].map((d,i)=>({t0:d,x:745-i*28,y0:900,y1:1030+i*8}));badge('b1','✔ Sin aguja 😅','gold',90,1440,t,9.8,12.3)}
+ else if(sc.s==12.5){glowK=ease((t-12.5)/1.2);Y.o=1-ease((t-12.5)/.4);Y={x:820,y:760,s:1.1,r:28,o:Y.o};
+   badge('b1','✔ Hidratación profunda','',90,1420,t,13.3,15.8);badge('b2','✨ Glow','gold',640,1530,t,13.9,15.8)}
+ else if(sc.s==16){glowK=1;const k=ease((t-16)/.6);W={x:540*k*0.35,y:-340*k,s:1-0.35*k,o:1};
+   const c=$('count');c.style.opacity=cl((t-16.2)/.3);c.textContent=String(Math.round(4533*ease((t-16.3)/1.4))).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+   const s=$('sub');s.style.opacity=cl((t-17)/.3);s.textContent='vendidas · 4,4 ⭐'}
+ else {glowK=1;const k=ease((t-18.5)/.5);W={x:189,y:-340-300*k,s:.65,o:1-k};A={x:540,y:980+fl,s:1.5*back((t-18.7)/.6),r:Math.sin(t*1.5)*4,o:1};
+   const a=$('p1');a.style.opacity=cl((t-19.3)/.2);a.innerHTML='🏷️ Descuento Black Friday';a.style.transform=`translateX(-50%) rotate(-3deg) scale(${Math.max(0,back((t-19.3)/.35))})`;
+   const b=$('p2');b.style.opacity=cl((t-20)/.2);b.innerHTML='<s style="opacity:.7;font-weight:600">20€</s>&nbsp; 11,82€ en TikTok Shop';b.style.transform=`translateX(-50%) scale(${Math.max(0,back((t-20)/.35))})`}
+ // woman
+ $('woman').setAttribute('transform',`translate(${W.x+540*(1-W.s)},${W.y+1000*(1-W.s)}) scale(${W.s})`);$('woman').setAttribute('opacity',W.o);
+ const skin=mix('#D8BEA6','#F5C6A0',glowK);['head','earL','earR','neck'].forEach(i=>$(i).setAttribute('fill',skin));
+ ['lidL','lidR'].forEach(i=>$(i).setAttribute('fill',skin));
+ $('dry').setAttribute('opacity',1-glowK);['blL','blR'].forEach(i=>$(i).setAttribute('opacity',.55*glowK));
+ ['hl','hl2'].forEach(i=>$(i).setAttribute('opacity',.8*glowK));
+ $('spark').setAttribute('opacity',glowK);[1,2,3,4].forEach(i=>{const e=$('s'+i);const tr=e.getAttribute('transform').split(' scale')[0];e.setAttribute('transform',tr+` scale(${.6+.5*Math.abs(Math.sin(t*3+i))})`)});
+ const cy=lerp(1080,1135,glowK),ey=lerp(1100,1095,glowK);$('mouth').setAttribute('d',`M495,${ey} Q540,${cy} 585,${ey}`);
+ // blink
+ const bl=((t%3.2)>3.05)?54:0;['lidL','lidR'].forEach(i=>$(i).setAttribute('height',bl*2));
+ // eyes look at syringe in scene 4
+ const lk=(sc.s==9)?ease((t-9.3)/.4)*10:0;$('pL').setAttribute('cx',460+lk);$('pR').setAttribute('cx',630+lk);
+ tf('amp',A.x,A.y,A.s,A.r,A.o);tf('syr',Y.x,Y.y,Y.s,Y.r,Y.o);
+ $('plunger').setAttribute('transform',`translate(0,${-120*fill})`);
+ const h=200*fill;$('sliq').setAttribute('y',70-h);$('sliq').setAttribute('height',h);
+ [...sf.children].forEach((r,i)=>{r.setAttribute('x',-18+((i*13)%34));r.setAttribute('y',70-h*((i+1)/9)+Math.sin(t*3+i)*4);r.setAttribute('opacity',fill)});
+ [...dr.children].forEach((c,i)=>{const d=drops[i];if(!d){c.setAttribute('opacity',0);return}const k=cl((t-d.t0)/.5);c.setAttribute('cx',d.x);c.setAttribute('cy',lerp(d.y0,d.y1,k*k));c.setAttribute('opacity',k>0&&k<1?1:0)});
+ $('glow').style.opacity=.7+.3*Math.sin(t*1.5);
+};
+render(0);
+</script></body></html>
