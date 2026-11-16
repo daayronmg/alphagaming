@@ -123,13 +123,13 @@ window.render=function(t){
  if(sc.s==0){tf('paco',540,1180,.95,Math.sin(t*1.2)*2);const k=ease((t-.3)/.8);tf("salmon",lerp(1400,560,k),640+bob,.9,sw)}
  else if(sc.s==4){tf('paco',540,1180,.95,0);tf("salmon",560,640+bob,.9,sw);bub("¿?",760,520,t,4.2,5.5)}
  else if(sc.s==5.5){const k=ease((t-5.5)/.5);tf('juani',lerp(1500,540,k),1200,.95,0);$('phone').setAttribute('opacity',1);$('phone').setAttribute('transform',`translate(150,330) rotate(${-10+Math.sin(t*8)*4})`)}
- else if(sc.s==9){tf('juani',540,1200,.95,0);$('jar').setAttribute('opacity',1);tf('paco',lerp(-500,170,ease((t-9.2)/.6)),1500,.6,0);bub('Juani, ¿qué te echas?',260,1050,t,10,13)}
+ else if(sc.s==9){tf('juani',540,1200,.95,0);$('jar').setAttribute('opacity',1);tf('paco',lerp(-500,170,ease((t-9.2)/.6)),1500,.6,0);bub('Juani, ¿qué te echas?',260,1050,t,12,13)}
  else if(sc.s==13){shock=1;tf('paco',540,1180,1+0.35*ease((t-13)/.4),Math.sin(t*40)*2*cl((t-13)/.3));$('flash').style.opacity=t<13.25?0.85*(1-(t-13)/.25):0}
  else if(sc.s==15.5){shock=.6;tf('pan',540,1350,1,0);const fl=$('flames');fl.setAttribute('transform',`scale(1,${1+Math.sin(t*12)*.12})`);tf('salmon',540,1180+Math.abs(Math.sin(t*6))*-60,.85,Math.sin(t*12)*8);$('sweat').setAttribute('opacity',1);$('glasses').setAttribute('opacity',0)}
  else if(sc.s==19){$('glasses').setAttribute('opacity',1);const o=ease((t-19)/.5);dna.setAttribute('opacity',o);
    [...dna.children].forEach(el=>{const i=+el.dataset.i,y=600+i*48,ph=t*3+i*.45,xa=540+Math.sin(ph)*220,xb=540-Math.sin(ph)*220;
     if(el.dataset.k=='a'){el.setAttribute('cx',xa);el.setAttribute('cy',y)}else if(el.dataset.k=='b'){el.setAttribute('cx',xb);el.setAttribute('cy',y)}else{el.setAttribute('x1',xa);el.setAttribute('x2',xb);el.setAttribute('y1',y);el.setAttribute('y2',y)}});
-   bub("más brillo que un Seat Ibiza recién lavao",110,1640,t,22,25.5)}
+   bub("más brillo que un Seat Ibiza recién lavao",110,1640,t,23.5,25.5)}
  else if(sc.s==25.5){tf('juani',300,1250,.75,0);$('jspark').setAttribute('opacity',1);document.querySelectorAll('.jgl').forEach(e=>e.setAttribute('opacity',.85));
    tf('caj',lerp(1500,820,ease((t-25.8)/.6)),1300,.75,0);bub("¿me enseñas el DNI?",520,860,t,27.5,32)}
  else if(sc.s==32){tf('paco',540,1180,.95,0);$('pjar').setAttribute('opacity',1);tf('salmon',lerp(1400,780,ease((t-32.6)/.6)),760+bob,.6,sw,-1)}
