@@ -13,7 +13,24 @@ svg{position:absolute;left:0;top:0}
 <div id="bg"></div>
 <svg width="1080" height="1920" viewBox="0 0 1080 1920">
 <defs><linearGradient id="fish" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8FA9C4"/><stop offset=".45" stop-color="#F28C6B"/><stop offset="1" stop-color="#FFD9C7"/></linearGradient>
-<radialGradient id="shine"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+<radialGradient id="shine"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient><symbol id="stick" viewBox="-100 -330 200 660" overflow="visible">
+ <linearGradient id="stg" x1="0" x2="1"><stop offset="0" stop-color="#E9AECB"/><stop offset=".35" stop-color="#F6C9DC"/><stop offset=".7" stop-color="#F1BCD3"/><stop offset="1" stop-color="#DFA1BF"/></linearGradient>
+ <linearGradient id="bal" x1="0" x2="1"><stop offset="0" stop-color="#F3CED6"/><stop offset=".5" stop-color="#FBE3E8"/><stop offset="1" stop-color="#EDC1CB"/></linearGradient>
+ <path d="M-62,-300 Q-62,-325 0,-326 Q62,-325 62,-300 L62,-190 L-62,-190 Z" fill="url(#bal)"/>
+ <rect x="-78" y="-200" width="156" height="120" rx="8" fill="#F6CEDD" opacity=".95"/>
+ <rect x="-78" y="-200" width="156" height="120" rx="8" fill="#fff" opacity=".18"/>
+ <rect x="-82" y="-95" width="164" height="22" fill="#E7B3C9" opacity=".8"/>
+ <path d="M-82,-80 L82,-80 L82,300 Q82,325 57,325 L-57,325 Q-82,325 -82,300 Z" fill="url(#stg)"/>
+ <g transform="rotate(-90)" fill="#fff" font-family="Inter">
+  <text x="-312" y="-22" font-weight="700" font-size="52" letter-spacing="-1">medicube</text>
+  <g transform="translate(-75,-62)"><rect x="-9" y="-3" width="18" height="6"/><rect x="-3" y="-9" width="6" height="18"/><rect x="2" y="-14" width="12" height="12" fill="none" stroke="#fff" stroke-width="3"/></g>
+  <text x="-312" y="18" font-weight="600" font-size="19" letter-spacing="1">PDRN PINK COLLAGEN</text>
+  <text x="-312" y="42" font-weight="600" font-size="19" letter-spacing="1">VOLUME MULTI BALM</text>
+  <text x="-312" y="66" font-size="13">10 g / 0.35 oz.</text>
+  <text x="-30" y="-6" font-weight="800" font-size="62">5</text><text x="8" y="-30" font-weight="800" font-size="26">%</text>
+  <text x="-62" y="22" font-weight="700" font-size="15" letter-spacing="1">VOLUFILINE</text>
+ </g>
+</symbol></defs>
 
 <!-- PAN -->
 <g id="pan" opacity="0"><ellipse cx="0" cy="0" rx="330" ry="90" fill="#2a2a2e"/><ellipse cx="0" cy="-12" rx="300" ry="70" fill="#3b3b40"/><rect x="300" y="-22" width="260" height="34" rx="16" fill="#1c1c1f"/>
@@ -41,7 +58,7 @@ svg{position:absolute;left:0;top:0}
  <path d="M-240,-100 Q-230,-360 0,-370 Q220,-360 240,-120 Q160,-240 20,-260 Q-70,-200 -210,-170 Z" fill="#C98B4E"/>
  <g id="jspark" fill="#FFE9A8" opacity="0"><path d="M0,-30 L8,-8 L30,0 L8,8 L0,30 L-8,8 L-30,0 L-8,-8 Z" transform="translate(-190,-120)"/><path d="M0,-24 L6,-6 L24,0 L6,6 L0,24 L-6,6 L-24,0 L-6,-6 Z" transform="translate(190,-30)"/><path d="M0,-20 L5,-5 L20,0 L5,5 L0,20 L-5,5 L-20,0 L-5,-5 Z" transform="translate(70,130)"/></g>
  <g id="phone" opacity="0" transform="translate(150,330) rotate(-10)"><rect x="-70" y="-130" width="140" height="260" rx="22" fill="#111"/><rect x="-60" y="-115" width="120" height="230" rx="14" fill="#25F4EE"/><rect x="-60" y="-115" width="120" height="230" rx="14" fill="#FE2C55" opacity=".5"/></g>
- <g id="jar" opacity="0" transform="translate(-170,330)"><rect x="-70" y="-60" width="140" height="120" rx="20" fill="#FFB6C8"/><rect x="-76" y="-90" width="152" height="40" rx="12" fill="#F7F7F7"/><text x="-48" y="18" font-family="Inter" font-weight="900" font-size="34" fill="#C2185B">PDRN</text></g>
+ <g id="jar" opacity="0" transform="translate(-170,330)"><use href="#stick" x="-50" y="-165" width="100" height="330"/></g>
 </g>
 
 <!-- PACO -->
@@ -58,7 +75,7 @@ svg{position:absolute;left:0;top:0}
  <path d="M0,-10 q-18,55 10,64" stroke="#B9846A" stroke-width="9" fill="none" stroke-linecap="round"/>
  <path d="M-120,90 Q-60,40 0,70 Q60,40 120,90 Q60,80 0,95 Q-60,80 -120,90 Z" fill="#2a1d16"/>
  <ellipse id="pmouth" cx="0" cy="140" rx="40" ry="8" fill="#5a1f1f"/>
- <g id="pjar" opacity="0" transform="translate(190,330)"><rect x="-70" y="-60" width="140" height="120" rx="20" fill="#FFB6C8"/><rect x="-76" y="-90" width="152" height="40" rx="12" fill="#F7F7F7"/><text x="-48" y="18" font-family="Inter" font-weight="900" font-size="34" fill="#C2185B">PDRN</text></g>
+ <g id="pjar" opacity="0" transform="translate(190,330)"><use href="#stick" x="-50" y="-165" width="100" height="330"/></g>
 </g>
 
 <!-- CAJERA -->
@@ -83,12 +100,11 @@ svg{position:absolute;left:0;top:0}
  <g id="glasses"><rect x="170" y="-62" width="110" height="52" rx="18" fill="#111"/><rect x="120" y="-48" width="60" height="10" fill="#111"/><path d="M190,-52 l24,0" stroke="#555" stroke-width="6"/></g>
  <path id="fmouth" d="M275,30 q12,10 24,0" stroke="#8a3a2a" stroke-width="6" fill="none" stroke-linecap="round"/>
  <g id="sweat" fill="#8fd3ff" opacity="0"><path d="M120,-150 q14,24 0,34 q-14,-10 0,-34z"/><path d="M60,-170 q12,20 0,30 q-12,-10 0,-30z"/></g>
- <g id="fjar" opacity="0" transform="translate(40,150)"><rect x="-70" y="-60" width="140" height="120" rx="20" fill="#FFB6C8"/><rect x="-76" y="-90" width="152" height="40" rx="12" fill="#F7F7F7"/><text x="-48" y="18" font-family="Inter" font-weight="900" font-size="34" fill="#C2185B">PDRN</text></g>
+ <g id="fjar" opacity="0" transform="translate(40,150)"><use href="#stick" x="-50" y="-165" width="100" height="330"/></g>
 </g>
 
 <!-- BIG PRODUCT -->
-<g id="prod" opacity="0"><rect x="-190" y="-160" width="380" height="320" rx="50" fill="#FFB6C8"/><rect x="-205" y="-235" width="410" height="100" rx="30" fill="#F7F7F7"/>
- <text x="-130" y="10" font-family="Inter" font-weight="900" font-size="92" fill="#C2185B">PDRN</text><text x="-120" y="80" font-family="Inter" font-weight="700" font-size="40" fill="#C2185B">pink collagen</text></g>
+<g id="prod" opacity="0"><use href="#stick" x="-150" y="-495" width="300" height="990"/></g>
 </svg>
 <div id="flash"></div>
 <div class="cap" id="cap"></div>
@@ -133,7 +149,7 @@ window.render=function(t){
  else if(sc.s==25.5){tf('juani',300,1250,.75,0);$('jspark').setAttribute('opacity',1);document.querySelectorAll('.jgl').forEach(e=>e.setAttribute('opacity',.85));
    tf('caj',lerp(1500,820,ease((t-25.8)/.6)),1300,.75,0);bub("¿me enseñas el DNI?",520,860,t,27.5,32)}
  else if(sc.s==32){tf('paco',540,1180,.95,0);$('pjar').setAttribute('opacity',1);tf('salmon',lerp(1400,780,ease((t-32.6)/.6)),760+bob,.6,sw,-1)}
- else {const k=back((t-35.5)/.6);tf('prod',540,1050,1.3*Math.max(0,k),Math.sin(t*2)*3);const k2=ease((t-38)/2);tf('salmon',lerp(1300,-500,k2),1500+bob,.7,sw,-1)}
+ else {const k=back((t-35.5)/.6);tf('prod',540,1080,1.0*Math.max(0,k),Math.sin(t*2)*3);const k2=ease((t-38)/2);tf('salmon',lerp(1300,-500,k2),1500+bob,.7,sw,-1)}
  if(sc.s!=25.5)document.querySelectorAll('.jgl').forEach(e=>e.setAttribute('opacity',0));
  if(sc.s!=15.5)$('glasses').setAttribute('opacity',1);
  // paco face
