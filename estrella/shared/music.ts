@@ -46,6 +46,8 @@ export interface Measure {
   volta?: number;
   /** «1ª vez»: dentro de una repetición solo suena la primera vuelta; en la segunda calla */
   firstTimeOnly?: boolean;
+  /** semitonos de más (o de menos) con que suena este compás: para adaptar un tramo a lo que da el instrumento */
+  transpose?: number;
 }
 
 export interface ScoreDoc {
@@ -228,6 +230,7 @@ export function validateScore(d: any): string | null {
   const ids = new Set<string>();
   for (const m of d.measures) {
     if (typeof m.id !== 'string' || !Number.isInteger(m.n) || !Array.isArray(m.notes)) return 'Compás mal formado';
+    if (m.transpose != null && (!Number.isInteger(m.transpose) || Math.abs(m.transpose) > 24)) return `Transposición del compás ${m.n} no válida`;
     if (m.notes.length > 128) return `Demasiadas notas en el compás ${m.n}`;
     for (const n of m.notes) {
       if (typeof n.id !== 'string' || ids.has(n.id)) return `Identificador de nota repetido o ausente (compás ${m.n})`;
