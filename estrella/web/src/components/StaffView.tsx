@@ -131,7 +131,7 @@ export default function StaffView(p: Props) {
             const nm = new Annotation(`${STEP_ES[n.step]}${(n.alter ?? 0) > 0 ? '♯' : (n.alter ?? 0) < 0 ? '♭' : ''}`);
             nm.setFont('Inter', 10, 'bold'); nm.setVerticalJustification(Annotation.VerticalJustify.BOTTOM); sn.addModifier(nm, 0);
             if (p.cornetKeys) {
-              const pos = cornetPosition(midiOf(n.step, n.octave!, n.alter ?? 0) + doc.transposition);
+              const pos = cornetPosition(midiOf(n.step, n.octave!, n.alter ?? 0) + doc.transposition + (m.transpose ?? 0));
               if (pos) { const k = new Annotation(pos); k.setFont('Inter', 11, 'bold'); k.setVerticalJustification(Annotation.VerticalJustify.BOTTOM); sn.addModifier(k, 0); }
             }
           }

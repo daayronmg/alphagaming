@@ -5,7 +5,7 @@ import type { HeadSource as Transcription } from './pdf';
 /** Lo que se dibuja encima del original para una nota: dónde está, su nombre y (corneta) su posición de llave. */
 export interface OverlayHead extends NoteHead { name: string; key: '|' | '—' | null }
 
-const pitched = (d: ScoreDoc) => d.measures.flatMap((m) => m.notes).filter((n) => !n.rest && n.step) as (Note & { step: NonNullable<Note['step']> })[];
+const pitched = (d: ScoreDoc) => d.measures.flatMap((m) => m.notes.map((n) => (m.transpose ? { ...n, _tr: m.transpose } : n))).filter((n) => !n.rest && n.step) as (Note & { step: NonNullable<Note['step']>; _tr?: number })[];
 const midi = (n: Note) => midiOf(n.step!, n.octave!, n.alter ?? 0);
 /** altura escrita sin alteración (lo único que se ve seguro en una foto) */
 const diat = (n: Note) => n.octave! * 7 + STEPS.indexOf(n.step!);
@@ -55,7 +55,7 @@ function computeHeads(tr: Transcription, doc: ScoreDoc, cornet: boolean): Overla
     out.push({
       ...h, id: p?.id ?? `pdf:${x.id}`,
       name: `${STEP_ES[src.step!]}${alt > 0 ? '♯' : alt < 0 ? '♭' : ''}`,
-      key: cornet ? cornetPosition(midi(src) + doc.transposition) : null,
+      key: cornet ? cornetPosition(midi(src) + doc.transposition + ((src as any)._tr ?? 0)) : null,
     });
   }
   return out;
