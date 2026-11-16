@@ -29,6 +29,8 @@ export interface Note {
   artic?: Articulation[];
   dyn?: Dynamic;
   orn?: Ornament;
+  /** nota de adorno pequeña antes de esta (apoyatura): semitonos respecto a la nota (+2 = un tono por encima) */
+  grace?: number;
 }
 
 export interface Measure {
@@ -236,6 +238,7 @@ export function validateScore(d: any): string | null {
         if (!STEPS.includes(n.step) || !Number.isInteger(n.octave) || n.octave < 0 || n.octave > 9) return `Altura no válida (compás ${m.n})`;
         if (n.alter != null && (!Number.isInteger(n.alter) || Math.abs(n.alter) > 2)) return `Alteración no válida (compás ${m.n})`;
         if (n.orn != null && !ORNAMENTS.includes(n.orn)) return `Adorno no válido (compás ${m.n})`;
+        if (n.grace != null && (!Number.isInteger(n.grace) || n.grace === 0 || Math.abs(n.grace) > 12)) return `Apoyatura no válida (compás ${m.n})`;
       }
     }
   }

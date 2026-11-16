@@ -391,7 +391,7 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
   const secPerQuarter = 60 / opts.tempo / beatQuarters;
   type Ev = {
     t: number; dur: number; midi: number | null; perc: boolean; gain: number; id: string; cornet: boolean;
-    vel: number; accent: boolean; staccato: boolean; orn?: Ornament; fromMidi?: number | null; keyTurn?: boolean; tieOut?: boolean; retongue?: boolean; nextSame?: boolean;
+    vel: number; accent: boolean; staccato: boolean; orn?: Ornament; grace?: number; fromMidi?: number | null; keyTurn?: boolean; tieOut?: boolean; retongue?: boolean; nextSame?: boolean;
   };
   // matices: cada uno se mantiene hasta el siguiente
   const DYN: Record<string, number> = { pp: 0.4, p: 0.55, mp: 0.68, mf: 0.8, f: 0.92, ff: 1, sfz: 1 };
@@ -425,7 +425,7 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
         else pev.push(tied = {
           t: t + mt * secPerQuarter, dur: q * secPerQuarter, midi, perc: !!p.perc || p.doc.clef === 'percussion', gain: p.gain, id: n.id, cornet: p.doc.clef === 'treble',
           vel: level, accent: artic.includes('accent') || artic.includes('marcato') || n.dyn === 'sfz', staccato: artic.includes('staccato'),
-          orn: midi != null ? n.orn : undefined,
+          orn: midi != null ? n.orn : undefined, grace: midi != null ? n.grace : undefined,
         });
         if (!n.tie || midi == null) tied = null;
         mt += q;
@@ -437,11 +437,13 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
     // adornos: la nota (ya con sus ligaduras) se reparte en notas rapidísimas enlazadas, como las toca el solista
     for (let i = pev.length - 1; i >= 0; i--) {
       const e = pev[i];
-      if (!e.orn || e.midi == null) continue;
-      const parts = ornament(e.orn, e.midi, e.dur);
+      if ((!e.orn && !e.grace) || e.midi == null) continue;
+      let parts: [number, number][] = e.orn ? ornament(e.orn, e.midi, e.dur) : [[e.midi, e.dur]];
+      // apoyatura: una nota cortita (la pequeña de la partitura) que se come el principio de la nota
+      if (e.grace && parts[0][1] > 0.16) parts = [[e.midi + e.grace, 0.085], [parts[0][0], parts[0][1] - 0.085], ...parts.slice(1)];
       if (parts.length < 2) continue;
       let tt = e.t;
-      pev.splice(i, 1, ...parts.map(([pm, d], k) => { const x = { ...e, t: tt, dur: d, midi: pm, accent: e.accent && k === 0, orn: undefined }; tt += d; return x; }));
+      pev.splice(i, 1, ...parts.map(([pm, d], k) => { const x = { ...e, t: tt, dur: d, midi: pm, accent: e.accent && k === 0, orn: undefined, grace: undefined }; tt += d; return x; }));
     }
     // fraseo: notas pegadas (sin silencio entre medias) se enlazan; al cambiar de posición de llave, se oye el giro
     for (let i = 0; i + 1 < pev.length; i++) {
