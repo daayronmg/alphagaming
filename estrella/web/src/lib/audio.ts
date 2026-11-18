@@ -381,6 +381,8 @@ function ornament(o: Ornament, midi: number, dur: number): [number, number][] {
 export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean }[], opts: {
   from: number; to: number; tempo: number; loop?: boolean; metronome?: boolean; startDelay?: number;
   onMeasure?: (n: number) => void; onNote?: (id: string | null) => void; onEnd?: () => void;
+  /** cada golpe del metrónomo: tiempo dentro del compás (0 = el fuerte) y tiempos del compás */
+  onBeat?: (beat: number, of: number) => void;
 }): ScorePlayback {
   const c = audioCtx();
   loadCornetSamples(); // por si aún no se habían pedido (las primeras notas pueden salir sintetizadas)
@@ -479,7 +481,16 @@ export function playScores(parts: { doc: ScoreDoc; gain: number; perc?: boolean 
       const delay = (base + e.t - c.currentTime) * 1000;
       timers.push(window.setTimeout(() => opts.onNote?.(e.midi != null ? e.id : null), Math.max(0, delay)));
     }
-    while (cidx < clicks.length && base + clicks[cidx] < horizon) { click(c, master, base + clicks[cidx], cidx % beatsPerMeasure === 0); cidx++; }
+    while (cidx < clicks.length && base + clicks[cidx] < horizon) {
+      const ct = clicks[cidx];
+      // tiempo dentro del compás que suena (así cuadra también tras una anacrusa)
+      let ms = measureStarts[0];
+      for (const s of measureStarts) { if (s.t <= ct + 1e-6) ms = s; else break; }
+      const beat = ms ? Math.round((ct - ms.t) / (secPerQuarter * beatQuarters)) % beatsPerMeasure : cidx % beatsPerMeasure;
+      click(c, master, base + ct, beat === 0);
+      if (opts.onBeat) timers.push(window.setTimeout(() => opts.onBeat?.(beat, beatsPerMeasure), Math.max(0, (base + ct - c.currentTime) * 1000)));
+      cidx++;
+    }
     while (midx < measureStarts.length && base + measureStarts[midx].t < horizon) {
       const ms = measureStarts[midx++];
       timers.push(window.setTimeout(() => opts.onMeasure?.(ms.n), Math.max(0, (base + ms.t - c.currentTime) * 1000)));
