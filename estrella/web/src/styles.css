@@ -646,3 +646,9 @@ html.solo-route .main { margin: 0 !important; }
 .beat-dots span.on.k1 { animation: beatPop2 .18s var(--ease); }
 @keyframes beatPop { from { transform: scale(1.8); } to { transform: scale(1.35); } }
 @keyframes beatPop2 { from { transform: scale(1.8); } to { transform: scale(1.35); } }
+
+.offline-card { display: flex; align-items: center; gap: 14px; }
+.offline-ico { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: #e8f0fe; color: var(--info); }
+.offline-card.saved .offline-ico { background: #e7f6ec; color: var(--ok); }
+:root[data-theme="dark"] .offline-ico { background: var(--surface-2); }
+.offline-card .btn { flex: none; }
