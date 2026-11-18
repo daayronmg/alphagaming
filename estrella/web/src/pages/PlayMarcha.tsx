@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Play, Square, FileText, ChevronLeft, Info, Wand2, Gauge, Pencil, Maximize, Minimize, RotateCw, Video, Lock, Trash2 } from '../components/icons';
+import { Play, Square, FileText, ChevronLeft, Info, Wand2, Gauge, Pencil, Maximize, Minimize, RotateCw, Video, Lock, Trash2, ZoomIn } from '../components/icons';
 import { get, post, put, del } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useLoad, Spinner, ErrorBox, Notice, useToast, Modal, Field } from '../components/ui';
@@ -137,6 +137,16 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   useEffect(() => onFullscreen(() => setFull(isFullscreen())), []);
   // al salir de la marcha, se quita el modo foco
   useEffect(() => () => { document.documentElement.classList.remove('pseudo-full'); }, []);
+  // tocando una marcha: la partitura ocupa toda la pantalla, sin menús alrededor
+  useEffect(() => {
+    if (embedded) return;
+    document.documentElement.classList.add('solo-route');
+    return () => document.documentElement.classList.remove('solo-route');
+  }, [embedded]);
+  // tamaño de la partitura (se recuerda): 100 % = a todo el ancho
+  const SIZES = [1, 1.25, 1.5, 1.75];
+  const [size, setSize] = useState(() => { try { const v = Number(localStorage.getItem('estrella.zoom')); return SIZES.includes(v) ? v : 1; } catch { return 1; } });
+  useEffect(() => { try { localStorage.setItem('estrella.zoom', String(size)); } catch { /* */ } }, [size]);
   // la partitura acompaña a la música: se desplaza al compás que suena
   useEffect(() => {
     if (measure == null || document.querySelector('[data-testid=note-playing]')) return;
@@ -178,7 +188,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const shownHead = playing ? lastHead.current : null;
   const original = mine.part && (
     <ScoreCanvas url={fileUrl(mine.part.file_id)} range={mine.part.page_from ? [mine.part.page_from, mine.part.page_to] : null}
-      kind={mine.part.file_kind === 'image' ? 'image' : 'pdf'} zoom={1} tool="none" color="#000" width={3} symbol=""
+      kind={mine.part.file_kind === 'image' ? 'image' : 'pdf'} zoom={land ? 1 : size} trim tool="none" color="#000" width={3} symbol=""
       annotations={[]} measureMap={map} highlights={curBox ? [{ ...curBox, variant: 'current' }] : []} tint={colors ? (marks.data?.length ? marks.data : heads?.filter((h) => h.line != null) as any) ?? null : null}
       heads={heads} names={origNames} playingId={shownHead} />
   );
@@ -228,6 +238,11 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
       {full ? <Minimize size={size} /> : <Maximize size={size} />}
     </button>
   );
+  const sizeBtn = (cls: string) => (showOriginal && !land ? (
+    <button className={cls} onClick={() => setSize(SIZES[(SIZES.indexOf(size) + 1) % SIZES.length])} aria-label="Tamaño de la partitura" data-testid="size-toggle">
+      <ZoomIn size={16} /> {size === 1 ? 'Tamaño' : `${Math.round(size * 100)} %`}
+    </button>
+  ) : null);
   const colorBtn = (cls: string) => (
     <button className={`${cls} ${colors ? 'primary' : ''}`} onClick={() => setColors(!colors)} aria-pressed={colors} data-testid="colors-toggle">Colores</button>
   );
@@ -274,11 +289,14 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   // fuera del ensayo, igual de limpia: la marcha entera para leer y escuchar, sin menús alrededor
   if (doc) {
     return (
-      <div className={embedded ? 'live-play' : 'live-play solo-play'}>
+      <div className={embedded ? 'live-play' : `live-play solo-play ${showOriginal ? 'wide' : ''}`}>
         {!embedded && (
           <div className="solo-top">
             <button className="btn icon ghost" onClick={() => (history.length > 1 ? nav(-1) : nav('/'))} aria-label="Volver"><ChevronLeft size={22} /></button>
-            <div className="grow" />
+            <div className="grow solo-name">
+              <strong className="ellipsis">{x.title}</strong>
+              <span className="xs muted ellipsis">{mine.assignment ? `Tu parte: ${mine.assignment.instrument}${mine.assignment.voice ? ` ${mine.assignment.voice}` : ''}` : x.composer || ''}</span>
+            </div>
             {mine.part && !showOriginal && <Link className="btn sm ghost" to={`/partitura/${mine.part.id}`}><FileText size={15} /> Original</Link>}
             {can('scores.publish') && scoreId && <Link className="btn sm ghost" to={`/score/${scoreId}`}><Pencil size={15} /> Notas</Link>}
             {can('library.manage') && !x.private && <Link to={`/marchas/${x.id}`} className="btn sm ghost">Ficha</Link>}
@@ -286,7 +304,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
             {fullBtn('btn icon ghost', 20)}
           </div>
         )}
-        <div className="live-title">
+        <div className={`live-title ${embedded ? '' : 'in-bar'}`}>
           <h1>{x.title}</h1>
           <div className="small muted ellipsis">{mine.assignment ? `Tu parte: ${mine.assignment.instrument}${mine.assignment.voice ? ` ${mine.assignment.voice}` : ''}` : x.composer || ''}</div>
         </div>
@@ -315,6 +333,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
           <button className="btn live-chip-btn" onClick={nextSpeed} aria-label="Velocidad"><Gauge size={16} /> {speed} %</button>
           {colorBtn('btn live-chip-btn')}
           {notesBtn('btn live-chip-btn')}
+          {sizeBtn('btn live-chip-btn')}
           <button className={`btn live-chip-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">{narrow ? 'Metr.' : 'Metrónomo'}</button>
           {embedded && fullBtn('btn live-chip-btn', 16)}
         </div>

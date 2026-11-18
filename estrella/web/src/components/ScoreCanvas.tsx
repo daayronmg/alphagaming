@@ -38,6 +38,8 @@ interface Props {
   tint?: HeadMark[] | null;
   /** notas del original: nombre (y posición de llave) debajo y la que suena señalada; no toca el dibujo */
   heads?: OverlayHead[] | null;
+  /** recorta los márgenes blancos de cada página para que la música ocupe todo el ancho */
+  trim?: boolean;
   names?: boolean;
   playingId?: string | null;
 }
@@ -134,6 +136,33 @@ function tintHeads(cv: HTMLCanvasElement, marks: HeadMark[]) {
   }
 }
 
+type Crop = { x: number; y: number; w: number; h: number };
+const cropCache = new WeakMap<PageSource, Crop>();
+/** Zona con tinta de la página (normalizada), con un pequeño margen. Se calcula con un dibujo pequeño. */
+async function contentBox(src: PageSource): Promise<Crop> {
+  const hit = cropCache.get(src);
+  if (hit) return hit;
+  const cv = document.createElement('canvas');
+  await src.render(cv, 500 / Math.min(window.devicePixelRatio || 1, 3));
+  const { width: W, height: H } = cv;
+  const d = cv.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, W, H).data;
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) {
+    const i = (y * W + x) * 4;
+    if (d[i + 3] > 0 && (d[i] + d[i + 1] + d[i + 2]) / 3 < 200) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  let c: Crop = { x: 0, y: 0, w: 1, h: 1 };
+  if (x1 > x0 && y1 > y0) {
+    const m = 0.012;
+    const x = Math.max(0, x0 / W - m), y = Math.max(0, y0 / H - m);
+    c = { x, y, w: Math.min(1, x1 / W + m) - x, h: Math.min(1, y1 / H + m) - y };
+    // si apenas hay margen, no se recorta
+    if (c.w > 0.95 && c.h > 0.95) c = { x: 0, y: 0, w: 1, h: 1 };
+  }
+  cropCache.set(src, c);
+  return c;
+}
+
 function Page({ src, index, width, props, registerCanvas }: { src: PageSource; index: number; width: number; props: Props; registerCanvas: (i: number, c: HTMLCanvasElement | null) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -150,13 +179,23 @@ function Page({ src, index, width, props, registerCanvas }: { src: PageSource; i
   // (la forma es la del original: una blanca sigue hueca; nada se mueve ni se añade)
   const tint = props.tint?.filter((t) => t.page === page) ?? null;
   const tintKey = tint ? tint.length : -1;
+  // sin márgenes: primero se mide dónde está la música y luego se dibuja la página más grande, recortada
+  const [crop, setCrop] = useState<Crop | null>(() => (props.trim ? cropCache.get(src) ?? null : null));
+  useEffect(() => {
+    if (!props.trim) { setCrop(null); return; }
+    let off = false;
+    contentBox(src).then((c) => { if (!off) setCrop(c); }).catch(() => { if (!off) setCrop({ x: 0, y: 0, w: 1, h: 1 }); });
+    return () => { off = true; };
+  }, [src, props.trim]);
+  const waiting = !!props.trim && !crop;
+  const innerW = crop ? width / crop.w : width;
   useEffect(() => {
     const cv = canvasRef.current;
-    if (!cv || width <= 0) return;
+    if (!cv || width <= 0 || waiting) return;
     let off = false;
-    src.render(cv, width).then(() => { if (!off && tint?.length) tintHeads(cv, tint); }).catch(() => {});
+    src.render(cv, innerW).then(() => { if (!off && tint?.length) tintHeads(cv, tint); }).catch(() => {});
     return () => { off = true; };
-  }, [src, width, tintKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [src, innerW, waiting, tintKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { registerCanvas(index, canvasRef.current); return () => registerCanvas(index, null); }, [index, registerCanvas]);
 
   const norm = (e: RPE): [number, number] => {
@@ -242,8 +281,10 @@ function Page({ src, index, width, props, registerCanvas }: { src: PageSource; i
   }
 
   return (
-    <div className={`score-page ${active && props.tool !== 'select' ? 'drawing' : ''}`} style={{ width }} data-page={page}>
+    <div className={`score-page ${active && props.tool !== 'select' ? 'drawing' : ''} ${crop ? 'trimmed' : ''}`} data-page={page}
+      style={crop ? { width, height: crop.h * innerW * ar } : { width, ...(waiting ? { aspectRatio: `${src.width} / ${src.height}` } : {}) }}>
       <span className="page-no">pág. {page}</span>
+      <div className="score-inner" style={crop ? { position: 'absolute', width: innerW, left: -crop.x * innerW, top: -crop.y * innerW * ar } : undefined}>
       <canvas ref={canvasRef} style={{ aspectRatio: `${src.width} / ${src.height}` }} />
       {hls.map((h, i) => (
         <div key={i} className={`measure-hl ${h.variant === 'loop' ? 'loop' : ''}`} style={{ left: `${h.x * 100}%`, top: `${h.y * 100}%`, width: `${h.w * 100}%`, height: `${h.h * 100}%`, ...(h.variant === 'doubt' ? { borderColor: '#2563eb', background: 'rgba(37,99,235,.10)', boxShadow: 'none' } : {}) }} data-testid={h.variant === 'current' ? 'measure-highlight' : undefined}>
@@ -289,6 +330,7 @@ function Page({ src, index, width, props, registerCanvas }: { src: PageSource; i
           })}
         </svg>
       )}
+      </div>
     </div>
   );
 }
@@ -337,7 +379,7 @@ export default function ScoreCanvas(props: Props) {
 
   // en horizontal la página se ajusta a lo alto (la más alta manda) y, si caben, las páginas van una al lado de otra
   const maxAr = pages?.length ? Math.max(...pages.map((p) => p.height / p.width)) : 1.414;
-  const base = land ? Math.min(avail, Math.floor((availH - 6) / maxAr)) : Math.min(avail, 1100);
+  const base = land ? Math.min(avail, Math.floor((availH - 6) / maxAr)) : props.trim ? avail : Math.min(avail, 1100);
   const width = Math.round(base * props.zoom);
 
   useEffect(() => {
