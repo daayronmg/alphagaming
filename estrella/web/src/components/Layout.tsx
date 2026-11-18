@@ -132,6 +132,7 @@ export default function Layout() {
           <div className="brand-mark"><img src={logoUrl(branding)} alt="" /></div>
           <div><div className="brand-name">{appName}</div><div className="brand-sub">{branding.bandName}</div></div>
         </Link>
+        {me.canSwitchMode && <div className="side-mode"><ModeSwitch member={!!me.actingMember} onDone={() => {}} /></div>}
         {visible.map((l) => {
           const header = l.group && l.group !== lastGroup ? <div className="nav-group" key={`g-${l.group}`}>{l.group}</div> : null;
           lastGroup = l.group ?? lastGroup;

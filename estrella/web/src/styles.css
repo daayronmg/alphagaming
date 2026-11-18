@@ -632,3 +632,6 @@ html.solo-route .main { margin: 0 !important; }
 .solo-name strong { font-size: 1.05rem; }
 .live-title.in-bar { display: none; }
 .solo-play.wide .live-score.is-original { overflow-x: auto; margin: 0 -10px; padding: 0 10px; }
+
+.side-mode { padding: 0 6px 14px; }
+.side-mode .mode-switch { width: 100%; }
