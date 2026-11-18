@@ -287,6 +287,8 @@ textarea.input { min-height: 96px; resize: vertical; }
 .score-scroll { flex: 1; overflow: auto; background: #3a3f4b; padding: 18px; scroll-behavior: smooth; position: relative; }
 :root[data-theme='light'] .score-scroll { background: #d9d6cc; }
 .score-page { position: relative; margin: 0 auto 18px; background: #fff; box-shadow: 0 6px 30px rgba(0,0,0,.35); border-radius: 4px; touch-action: pan-x pan-y; }
+.score-page.trimmed { overflow: hidden; }
+.score-inner { position: relative; }
 .score-page canvas { display: block; width: 100%; height: auto; border-radius: 4px; }
 .score-page .layer { position: absolute; inset: 0; width: 100%; height: 100%; }
 .score-page .heads-layer { pointer-events: none; }
@@ -620,3 +622,13 @@ html.pseudo-full .main { margin: 0 !important; }
 .ach-count strong { font-size: 2rem; font-weight: 800; letter-spacing: -.02em; }
 :root[data-theme="dark"] .ach.bronze .ach-tier, :root[data-theme="dark"] .ach.silver .ach-tier, :root[data-theme="dark"] .ach.gold .ach-tier { background: var(--surface-2); color: var(--text); }
 :root[data-theme="dark"] .ach-card-icon, :root[data-theme="dark"] .ach-trophy { background: rgba(201,153,43,.18); color: var(--gold-2); }
+
+/* tocando una marcha: pantalla entera para la partitura */
+html.solo-route .topbar, html.solo-route .bottom-nav, html.solo-route .sidebar { display: none !important; }
+html.solo-route .app { grid-template-columns: 1fr !important; }
+html.solo-route .main { margin: 0 !important; }
+.solo-play.wide { max-width: none; padding-left: 10px; padding-right: 10px; }
+.solo-name { display: grid; min-width: 0; line-height: 1.2; padding: 0 4px; }
+.solo-name strong { font-size: 1.05rem; }
+.live-title.in-bar { display: none; }
+.solo-play.wide .live-score.is-original { overflow-x: auto; margin: 0 -10px; padding: 0 10px; }
