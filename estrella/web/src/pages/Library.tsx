@@ -1,3 +1,4 @@
+import { OfflineDownload } from '../components/OfflineDownload';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Plus, Star, Music, FileText, Headphones, FileMusic, Folder, Upload, Wand2 } from '../components/icons';
@@ -29,6 +30,7 @@ export default function Library() {
         <div><div className="eyebrow">Repertorio</div><h1>Biblioteca musical</h1></div>
         {can('library.manage') && <div className="row">{can('scores.publish') && <button className="btn" onClick={() => setNotes(true)}><Wand2 size={18} /> Sacar notas de los PDF</button>}<Link className="btn" to="/biblioteca/importar"><Upload size={18} /> Libreto</Link><button className="btn primary" onClick={() => setAdding(true)}><Plus size={18} /> Añadir marcha</button></div>}
       </div>
+      <div style={{ marginBottom: 14 }}><OfflineDownload card /></div>
       <div className="card flat stack" style={{ marginBottom: 18 }}>
         <div className="row nowrap"><Search size={18} className="faint" /><input className="input" placeholder="Buscar por título o compositor…" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} aria-label="Buscar" /></div>
         <div className="row">

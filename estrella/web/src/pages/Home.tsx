@@ -59,6 +59,8 @@ export default function Home() {
         </div>
       </section>
 
+      <OfflineDownload card />
+
       {director && (
         <div className="director-actions">
           <button className="director-tile" onClick={() => setPlanning(true)} data-testid="plan-rehearsal">
@@ -120,7 +122,6 @@ export default function Home() {
       {/* 3. Elegir una marcha y tocar */}
       <div className="card stack">
         <div className="card-title"><h3><Music size={18} /> Mis marchas</h3><span className="xs faint">{list.length}</span></div>
-        <OfflineDownload />
         {me.privateLibrary && <Link className="btn sm" style={{ alignSelf: 'flex-start' }} to="/biblioteca/importar?privada=1" data-testid="add-private"><Lock size={15} /> Añadir marcha mía (solo para mí)</Link>}
         <div className="row nowrap"><Search size={18} className="faint" /><input className="input" placeholder="Busca una marcha…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar marcha" /></div>
         {marchas.data && !list.length && <p className="muted small">{q ? 'No hay ninguna marcha con ese nombre.' : 'Todavía no hay marchas. La dirección las sube desde la Biblioteca.'}</p>}
