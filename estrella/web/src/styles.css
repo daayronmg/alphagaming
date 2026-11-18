@@ -635,3 +635,14 @@ html.solo-route .main { margin: 0 !important; }
 
 .side-mode { padding: 0 6px 14px; }
 .side-mode .mode-switch { width: 100%; }
+
+/* metrónomo visual: un punto por tiempo; el que suena se enciende y el fuerte destaca */
+.beat-dots { display: flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 999px; background: var(--surface-2); flex: none; }
+.beat-dots span { width: 12px; height: 12px; border-radius: 50%; background: var(--surface-3); transition: background .06s, transform .06s; }
+.beat-dots span.strong { width: 15px; height: 15px; }
+.beat-dots span.on { background: var(--accent); transform: scale(1.35); }
+.beat-dots span.strong.on { background: var(--danger); }
+.beat-dots span.on.k0 { animation: beatPop .18s var(--ease); }
+.beat-dots span.on.k1 { animation: beatPop2 .18s var(--ease); }
+@keyframes beatPop { from { transform: scale(1.8); } to { transform: scale(1.35); } }
+@keyframes beatPop2 { from { transform: scale(1.8); } to { transform: scale(1.35); } }

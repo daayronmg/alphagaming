@@ -117,6 +117,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
   const [speed, setSpeed] = useState(() => Number(localStorage.getItem('estrella.speed')) || 100);
   const [names, setNames] = useState(() => localStorage.getItem('estrella.noteNames') !== '0');
   const [metro, setMetro] = useState(false);
+  const [beat, setBeat] = useState<{ b: number; of: number; k: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const pb = useRef<ScorePlayback | null>(null);
   const lastHead = useRef<string | null>(null);
@@ -193,7 +194,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
       heads={heads} names={origNames} playingId={shownHead} />
   );
 
-  const stop = () => { pb.current?.stop(); pb.current = null; setPlaying(false); setNoteId(null); setMeasure(null); };
+  const stop = () => { pb.current?.stop(); pb.current = null; setPlaying(false); setNoteId(null); setMeasure(null); setBeat(null); };
   const play = async () => {
     if (!doc) return;
     if (playing) return stop();
@@ -203,7 +204,8 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
     const ns = doc.measures.map((mm) => mm.n);
     pb.current = playScores([{ doc, gain: 1 }], {
       from: Math.min(...ns), to: Math.max(...ns), tempo: Math.round((doc.tempo * speed) / 100), metronome: metro,
-      onNote: setNoteId, onMeasure: setMeasure, onEnd: () => { setPlaying(false); setMeasure(null); pb.current = null; },
+      onNote: setNoteId, onMeasure: setMeasure, onEnd: () => { setPlaying(false); setMeasure(null); setBeat(null); pb.current = null; },
+      onBeat: metro ? (b, of) => setBeat((x) => ({ b, of, k: (x?.k ?? 0) + 1 })) : undefined,
     });
     setPlaying(true);
   };
@@ -253,6 +255,13 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
     <button className={`${cls} ${namesOn ? 'primary' : ''}`} onClick={() => (showOriginal ? setOrigNames(!origNames) : setNames(!names))} aria-pressed={namesOn} data-testid="names-toggle">Notas</button>
   ));
 
+  // metrónomo para la vista: puntos que se encienden a cada golpe (el primero, el fuerte), sin ocupar sitio
+  const beatDots = metro && playing && beat ? (
+    <div className="beat-dots" aria-label={`Tiempo ${beat.b + 1} de ${beat.of}`} data-testid="beat-dots">
+      {Array.from({ length: beat.of }, (_, i) => <span key={i} className={`${i === 0 ? 'strong' : ''} ${i === beat.b ? `on k${beat.k % 2}` : ''}`} />)}
+    </div>
+  ) : null;
+
   const turnHint = phone && !land && doc && (
     <button className="btn sm turn-hint" onClick={goFull}><RotateCw size={15} /> Gira el móvil para ver la marcha completa</button>
   );
@@ -275,6 +284,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
           <button className="btn full-btn" onClick={nextSpeed} aria-label="Velocidad">{speed} %</button>
           {colorBtn('btn full-btn')}
           {notesBtn('btn full-btn')}
+          {beatDots}
           <button className={`btn full-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">Metr.</button>
           {fullBtn('btn icon ghost', 18)}
         </div>
@@ -301,6 +311,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
             {can('scores.publish') && scoreId && <Link className="btn sm ghost" to={`/score/${scoreId}`}><Pencil size={15} /> Notas</Link>}
             {can('library.manage') && !x.private && <Link to={`/marchas/${x.id}`} className="btn sm ghost">Ficha</Link>}
             {x.private && <button className="btn sm ghost" onClick={async () => { if (!confirm(`¿Borrar «${x.title}»? Es tuya y solo la ves tú.`)) return; try { await del(`/library/private/marchas/${x.id}`); nav('/'); } catch (e) { toast({ kind: 'error', text: (e as Error).message }); } }} aria-label="Borrar"><Trash2 size={15} /></button>}
+            {beatDots}
             {fullBtn('btn icon ghost', 20)}
           </div>
         )}
@@ -335,6 +346,7 @@ export default function PlayMarcha({ marchaId, embedded }: { marchaId?: string; 
           {notesBtn('btn live-chip-btn')}
           {sizeBtn('btn live-chip-btn')}
           <button className={`btn live-chip-btn ${metro ? 'primary' : ''}`} onClick={() => { setMetro(!metro); if (playing) stop(); }} aria-pressed={metro} aria-label="Metrónomo">{narrow ? 'Metr.' : 'Metrónomo'}</button>
+          {embedded && beatDots}
           {embedded && fullBtn('btn live-chip-btn', 16)}
         </div>
       </div>
