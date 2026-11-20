@@ -1,0 +1,99 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1080px;height:1920px;overflow:hidden;background:#E3F2FD;font-family:'Inter','Noto Color Emoji',sans-serif;color:#0d2a44}
+svg{position:absolute;left:0;top:0}
+.ttl{position:absolute;left:40px;right:40px;top:200px;text-align:center;font-family:'Inter Display','Inter','Noto Color Emoji';font-weight:900;letter-spacing:-3px;line-height:1.02;color:#1E88E5;-webkit-text-stroke:6px #fff;paint-order:stroke fill;font-size:110px}
+.sub{position:absolute;left:40px;right:40px;text-align:center;font-weight:900;font-size:70px;color:#0d2a44}
+.tag{position:absolute;background:#fff;color:#0d2a44;font-weight:900;font-size:52px;padding:20px 36px;border-radius:60px;box-shadow:0 12px 30px rgba(13,42,68,.18);white-space:nowrap;opacity:0}
+.row{position:absolute;left:80px;right:80px;background:#fff;border-radius:40px;padding:34px 46px;font-size:60px;font-weight:900;box-shadow:0 16px 40px rgba(13,42,68,.15);opacity:0}
+.big{position:absolute;left:0;right:0;text-align:center;font-weight:900;-webkit-text-stroke:10px #fff;paint-order:stroke fill;opacity:0}
+.box{position:absolute;left:90px;right:90px;top:1080px;background:#fff;border-radius:44px;padding:40px 46px;font-size:50px;font-weight:700;opacity:0}
+</style></head><body>
+<svg width="1080" height="1920" viewBox="0 0 1080 1920">
+<defs>
+ <clipPath id="wheelClean"><rect id="wcr" x="0" y="0" width="0" height="1920"/></clipPath>
+ <clipPath id="tileClean"><rect id="tcr" x="540" y="0" width="0" height="1920"/></clipPath>
+ <clipPath id="mossClean"><rect id="mcr" x="0" y="0" width="0" height="1920"/></clipPath>
+ <pattern id="tl" width="180" height="180" patternUnits="userSpaceOnUse"><rect width="176" height="176" fill="#E9E2D3"/></pattern>
+ <pattern id="tld" width="180" height="180" patternUnits="userSpaceOnUse"><rect width="176" height="176" fill="#4b4436"/><circle cx="40" cy="60" r="20" fill="#3a3429"/><circle cx="120" cy="130" r="26" fill="#2f2a21"/></pattern>
+</defs>
+<!-- WHEEL -->
+<g id="wheel" opacity="0" transform="translate(540,1050)">
+ <circle r="330" fill="#1b1b1b"/><circle r="230" fill="#cfd6dc"/>
+ <g stroke="#9aa6b0" stroke-width="38" stroke-linecap="round"><line x1="0" y1="-200" x2="0" y2="200"/><line x1="-190" y1="-62" x2="190" y2="62"/><line x1="-190" y1="62" x2="190" y2="-62"/></g>
+ <circle r="55" fill="#8a96a0"/>
+ <g id="dirtW"><circle r="232" fill="#5b4a33" opacity=".85"/><circle cx="-80" cy="60" r="70" fill="#3d3021"/><circle cx="90" cy="-90" r="50" fill="#3d3021"/></g>
+</g>
+<!-- TILES -->
+<g id="tiles" opacity="0"><rect x="0" y="520" width="1080" height="1300" fill="url(#tld)"/><rect x="0" y="520" width="1080" height="1300" fill="url(#tl)" clip-path="url(#tileClean)"/></g>
+<!-- BIKE -->
+<g id="bike" opacity="0" transform="translate(540,1150)" stroke-linecap="round" fill="none">
+ <circle cx="-260" cy="120" r="170" stroke="#222" stroke-width="22"/><circle cx="260" cy="120" r="170" stroke="#222" stroke-width="22"/>
+ <path d="M-260,120 L-60,120 L80,-110 L-120,-110 Z M-60,120 L-140,-150 M80,-110 L260,120 M60,-160 L120,-160" stroke="#E53935" stroke-width="26"/>
+ <path d="M-170,-150 L-100,-150" stroke="#222" stroke-width="22"/>
+</g>
+<!-- MOSS -->
+<g id="moss" opacity="0"><rect x="0" y="520" width="1080" height="1300" fill="url(#tl)"/>
+ <g id="mossG"><path d="M0,700 Q300,640 520,760 T1080,720 L1080,1700 Q700,1760 400,1660 T0,1700 Z" fill="#3E6B2F"/><circle cx="300" cy="1000" r="120" fill="#2F5A22"/><circle cx="760" cy="1300" r="160" fill="#2F5A22"/></g>
+</g>
+<!-- BATTERY -->
+<g id="batt" opacity="0" transform="translate(540,1100)"><rect x="-200" y="-320" width="400" height="640" rx="40" fill="#fff" stroke="#0d2a44" stroke-width="18"/><rect x="-80" y="-370" width="160" height="60" rx="14" fill="#0d2a44"/><rect id="bfill" x="-170" y="-290" width="340" height="580" rx="20" fill="#43A047"/></g>
+<!-- GUN -->
+<g id="gun" opacity="0">
+ <rect x="-40" y="-40" width="560" height="34" rx="14" fill="#263238"/><rect x="510" y="-52" width="60" height="58" rx="10" fill="#FFC107"/>
+ <path d="M-260,-110 L40,-110 Q90,-110 90,-60 L90,40 Q90,80 40,80 L-120,80 L-160,280 Q-170,320 -210,320 L-260,320 Q-300,320 -290,280 L-250,80 L-270,80 Q-300,80 -300,40 L-300,-70 Q-300,-110 -260,-110 Z" fill="#FFC107"/>
+ <path d="M-250,80 L-160,80 L-185,190 L-275,190 Z" fill="#263238"/>
+ <rect x="-320" y="300" width="230" height="130" rx="22" fill="#263238"/><rect x="-300" y="320" width="60" height="16" rx="6" fill="#4CAF50"/>
+ <path d="M-120,90 Q-110,150 -150,170" stroke="#263238" stroke-width="22" fill="none" stroke-linecap="round"/>
+ <path d="M-300,-30 Q-420,-20 -440,120 Q-460,320 -380,520" stroke="#1565C0" stroke-width="22" fill="none" stroke-linecap="round" id="hose" opacity="0"/>
+ <g id="spray"></g>
+</g>
+<!-- BUCKET -->
+<g id="bucket" opacity="0" transform="translate(250,1600)"><path d="M-150,-130 L150,-130 L120,150 L-120,150 Z" fill="#90CAF9" stroke="#1565C0" stroke-width="12"/><ellipse cx="0" cy="-130" rx="150" ry="30" fill="#64B5F6"/></g>
+<g id="spark" fill="#fff" opacity="0"></g>
+</svg>
+<div class="ttl" id="ttl"></div>
+<div class="sub" id="sub" style="top:1480px;opacity:0"></div>
+<div class="tag" id="g1"></div><div class="tag" id="g2"></div><div class="tag" id="g3"></div>
+<div class="row" id="r1" style="top:520px;color:#2E7D32"></div><div class="row" id="r2" style="top:740px;color:#2E7D32"></div><div class="row" id="r3" style="top:960px;color:#2E7D32"></div>
+<div class="big" id="big"></div>
+<div class="box" id="box"><span style="display:inline-block;width:70px;height:70px;border-radius:50%;background:#1E88E5;vertical-align:middle;margin-right:20px"></span><span id="typ"></span></div>
+<script>
+const NS='http://www.w3.org/2000/svg',$=id=>document.getElementById(id);
+const cl=x=>x<0?0:x>1?1:x,ease=x=>{x=cl(x);return 1-Math.pow(1-x,3)},back=x=>{x=cl(x);const c=1.7;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)},lerp=(a,b,k)=>a+(b-a)*k;
+const sp=$('spray');for(let i=0;i<40;i++){const c=document.createElementNS(NS,'circle');c.setAttribute('fill','#4FC3F7');sp.appendChild(c)}
+const sk=$('spark');for(let i=0;i<12;i++){const p=document.createElementNS(NS,'path');p.setAttribute('d','M0,-28 L7,-7 L28,0 L7,7 L0,28 L-7,7 L-28,0 L-7,-7 Z');sk.appendChild(p)}
+function gun(x,y,s,r,o,spray,t){const g=$('gun');g.setAttribute('transform',`translate(${x},${y}) rotate(${r}) scale(${s})`);g.setAttribute('opacity',o);
+ [...sp.children].forEach((c,i)=>{const ph=((t*3+i/40)%1);c.setAttribute('cx',570+ph*700);c.setAttribute('cy',-24+(Math.sin(i*7.3))*ph*120);c.setAttribute('r',6+ph*10);c.setAttribute('opacity',spray?(1-ph):0)})}
+function tag(id,txt,x,y,t,t0){const e=$(id);e.textContent=txt;e.style.left=x+'px';e.style.top=y+'px';e.style.opacity=cl((t-t0)/.15);e.style.transform=`scale(${Math.max(0,back((t-t0)/.35))})`}
+function row(id,txt,t,t0){const e=$(id);e.textContent=txt;e.style.opacity=cl((t-t0)/.15);e.style.transform=`scale(${Math.max(0,back((t-t0)/.35))})`}
+function big(txt,top,size,color,t,t0){const e=$('big');e.innerHTML=txt;e.style.top=top+'px';e.style.fontSize=size+'px';e.style.color=color;e.style.opacity=cl((t-t0)/.12);e.style.transform=`scale(${Math.max(0,back((t-t0)/.3))})`}
+function sparks(cx,cy,R,t,o){sk.setAttribute('opacity',o);[...sk.children].forEach((p,i)=>{const a=i/12*6.28;p.setAttribute('transform',`translate(${cx+Math.cos(a+t)*R},${cy+Math.sin(a+t)*R*.6}) scale(${.5+.5*Math.abs(Math.sin(t*4+i))})`)})}
+const S=[0,6.3,14.2,24.3,31.5,40.4,48.3,51.1,57.3,63.0,65.4,73.8,79.9,82.6,86.6];
+window.render=t=>{
+ let si=0;for(let i=0;i<S.length-1;i++)if(t>=S[i]&&t<S[i+1])si=i;const lt=t-S[si];
+ ['wheel','tiles','bike','moss','batt','bucket'].forEach(i=>$(i).setAttribute('opacity',0));$('hose').setAttribute('opacity',0);
+ ['g1','g2','g3','r1','r2','r3','big','sub','box'].forEach(i=>$(i).style.opacity=0);sparks(0,0,0,t,0);
+ const T=$('ttl');let title='';const pop=1+.45*Math.exp(-lt*14);T.style.transform=`scale(${pop})`;T.style.color='#1E88E5';
+ gun(540,1100,0,0,0,false,t);
+ if(si==0){title='¿40€ SIN CABLES = KÄRCHER?';gun(lerp(1500,360,ease(lt/.8)),1150,.9,-8,1,lt>1.2,t)}
+ else if(si==1){title='EN EEUU 🇺🇸 EN 1 MES:';const c=ease((lt-.5)/2.5);big(`${(1.97*c).toFixed(2).replace('.',',')} MILLONES $ 💸`,820,130,'#1E88E5',t,S[1]+.4);$('sub').style.opacity=cl((t-11.8)/.3);$('sub').style.top='1300px';$('sub').textContent='¿merece la pena? 🤔'}
+ else if(si==2){title='CÓMO FUNCIONA';gun(470,1050,.85,0,1,t>21,t);$('hose').setAttribute('opacity',cl((t-17.5)/.3));$('bucket').setAttribute('opacity',cl((t-17.5)/.3));
+   tag('g1','🔋 batería',600,1450,t,15.9);tag('g2','🪣 cubo / garrafa',480,1600,t,18.0);tag('g3','🔌 sin cables',560,1300,t,22.2)}
+ else if(si==3){title='PRUEBA 1: LLANTA 🚗';$('wheel').setAttribute('opacity',1);const k=ease((t-25.7)/5);$('dirtW').setAttribute('opacity',1-k);gun(lerp(-50,200,k),720,.55,25,1,t>25.6&&t<30.8,t);if(t>30)sparks(540,1050,300,t,cl((t-30)/.3))}
+ else if(si==4){title='PRUEBA 2: BALDOSAS';$('tiles').setAttribute('opacity',1);const w=lerp(0,360,ease((t-32.9)/3.5))+lerp(0,640,ease((t-37.1)/2.5));$('tcr').setAttribute('x',540-w/2);$('tcr').setAttribute('width',w);gun(lerp(300,700,(Math.sin(t*1.5)+1)/2),640,.55,30,1,t>32.9,t)}
+ else if(si==5){title='PRUEBA 3: JARDÍN Y BICI 🚲';$('bike').setAttribute('opacity',1);sparks(540,1150,420,t,cl((t-42)/.3));tag('g1','✅ te la llevas a donde quieras',140,1500,t,44.9)}
+ else if(si==6){title='AHORA LO MALO 👀';T.style.color='#E53935'}
+ else if(si==7){title='❌ VERDÍN DE 10 AÑOS';T.style.color='#E53935';$('moss').setAttribute('opacity',1);$('mossG').setAttribute('opacity',1-0.25*ease((t-52)/4));gun(700,640,.55,30,1,t>51.5,t);$('sub').style.opacity=cl((t-55)/.3);$('sub').style.top='1760px';$('sub').innerHTML='le cuesta 😬'}
+ else if(si==8){title='❌ LA BATERÍA';T.style.color='#E53935';$('batt').setAttribute('opacity',1);const k=ease((t-57.6)/4);$('bfill').setAttribute('height',580*(1-k*.9));$('bfill').setAttribute('y',-290+580*k*.9);$('bfill').setAttribute('fill',k>.6?'#E53935':'#43A047');
+   $('sub').style.opacity=cl((t-58.5)/.3);$('sub').style.top='1520px';$('sub').innerHTML='da para 1 coche o 1 terraza<br><span style="font-size:52px">no para el patio de tu suegra 💀</span>'}
+ else if(si==9){title='¿MERECE LA PENA?';gun(380,1100,.9,-6,1,true,t)}
+ else if(si==10){title='EL VEREDICTO';row('r1','✅ COCHE Y BICI',t,65.9);row('r2','✅ TERRAZA',t,67.6);row('r3','✅ EL DÍA A DÍA',t,69.6);if(t>=71.9)big('CALIDAD-PRECIO:<br>TOP 🔝',1240,140,'#2E7D32',t,71.9)}
+ else if(si==11){title='¿SUSTITUYE A UNA PROFESIONAL?';if(t>=77.0)big('NO.',800,420,'#E53935',t,77.0);$('sub').style.opacity=cl((t-78.4)/.2);$('sub').style.top='1400px';$('sub').innerHTML='ahórrate el disgusto 💸'}
+ else if(si==12){title='EN LA CESTA 🛒';gun(380,1100,.9,-6,1,true,t)}
+ else {title='¿QUÉ PRODUCTO VIRAL ANALIZAMOS AHORA?';$('sub').style.opacity=cl((lt-.4)/.3);$('sub').style.top='820px';$('sub').innerHTML='déjalo en comentarios 💬';
+   const b=$('box');b.style.opacity=cl((lt-.8)/.2);$('typ').textContent='¡la aspiradora shark! 🙏'.slice(0,Math.max(0,Math.floor((lt-1)*22)));big('👇',1450,200,'#000',t,S[13]+1.4);$('big').style.webkitTextStroke='0'}
+ T.textContent=title;
+};
+render(0);
+</script></body></html>
