@@ -1,0 +1,45 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1080px;height:1920px;overflow:hidden;font-family:'Inter','Noto Color Emoji',sans-serif}
+#bg{position:absolute;inset:0}
+#img{position:absolute;left:50%;top:50%;width:900px;height:1440px;background:url(stick.jpg) center/contain no-repeat}
+#t{position:absolute;left:40px;right:40px;text-align:center;font-family:'Inter Display','Inter','Noto Color Emoji';font-weight:900;letter-spacing:-3px;line-height:1;color:#fff;-webkit-text-stroke:6px #000;paint-order:stroke fill;text-shadow:0 10px 0 #000}
+#flash{position:absolute;inset:0;background:#fff;opacity:0}
+#bar{position:absolute;left:0;top:0;height:16px;background:#FE2C55}
+.em{position:absolute;font-size:150px}
+</style></head><body>
+<div id="bg"></div><div id="img"></div><div id="t"></div>
+<div class="em" id="e1"></div><div class="em" id="e2"></div>
+<div id="flash"></div><div id="bar"></div>
+<script>
+const $=id=>document.getElementById(id);
+// [start, text, size, y, bg, zoom, rot, emoji1, emoji2]
+const C=[
+ [0,'PARA.',300,700,'#FE2C55',1.0,0,'✋',''],
+ [0.7,'ESTO 👇',240,260,'#FFD6E4',1.25,-6,'',''],
+ [1.5,'FUE EL Nº1 DE TIKTOK EN EEUU',150,180,'#FFF0F5',1.1,4,'🇺🇸','🏆'],
+ [3.0,'16,99 MILLONES $',170,250,'#111',0.9,0,'💸','💸'],
+ [4.2,'EN 3 MESES 🤯',190,260,'#FE2C55',1.15,-4,'',''],
+ [5.3,'UN STICK.',230,250,'#FFD6E4',1.35,8,'',''],
+ [6.2,'CON PDRN 🐟',200,250,'#E8F4FF',1.2,-8,'',''],
+ [7.2,'CABE EN EL BOLSO 👜',150,250,'#FFF0F5',0.95,0,'',''],
+ [8.3,'TE LO PASAS Y LISTO ✨',140,230,'#FFD6E4',1.1,5,'✨','✨'],
+ [9.6,'ANTES DE QUE SE HAGA VIRAL AQUÍ 🤫',150,230,'#111',1.0,0,'',''],
+ [11.0,'CORRE 🛒',260,250,'#FE2C55',1.3,-5,'🔥','🔥'],
+ [12.6,'',0,0,'#FE2C55',1.3,0,'','']];
+const cl=x=>x<0?0:x>1?1:x;
+window.render=function(t){
+ let i=C.length-2;for(let k=0;k<C.length-1;k++){if(t>=C[k][0]&&t<C[k+1][0]){i=k;break}}
+ const c=C[i],lt=t-c[0];
+ $('bg').style.background=c[4];
+ const punch=1+0.25*Math.exp(-lt*12);const shake=Math.exp(-lt*10)*18*Math.sin(lt*90);
+ $('img').style.transform=`translate(calc(-50% + ${shake}px),-38%) scale(${c[5]*punch*(1+lt*0.04)}) rotate(${c[6]}deg)`;
+ const T=$('t');T.textContent=c[1];T.style.fontSize=c[2]+'px';T.style.top=c[3]+'px';
+ const tp=1+0.6*Math.exp(-lt*18);T.style.transform=`scale(${tp}) rotate(${(i%2?-3:3)}deg)`;
+ T.style.color=(c[4]=='#111'||c[4]=='#FE2C55')?'#fff':'#fff';
+ $('flash').style.opacity=Math.max(0,0.7-lt*5);
+ [['e1',c[7],120,1400],['e2',c[8],820,1500]].forEach(([id,e,x,y],j)=>{const el=$(id);el.textContent=e;el.style.left=x+'px';el.style.top=(y-Math.sin(lt*6+j)*30)+'px';el.style.transform=`scale(${cl(lt*5)}) rotate(${Math.sin(lt*8+j)*15}deg)`});
+ $('bar').style.width=(t/12.6*1080)+'px';
+};
+render(0);
+</script></body></html>
