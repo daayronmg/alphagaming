@@ -1,0 +1,20 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0}body{width:1080px;height:1920px;overflow:hidden;background:#FBE3EC;font-family:'Inter','Noto Color Emoji',sans-serif}
+.ttl{position:absolute;left:50px;right:50px;text-align:center;font-family:'Inter Display','Inter','Noto Color Emoji';font-weight:900;letter-spacing:-3px;line-height:1.02;color:#FF5C9A;-webkit-text-stroke:6px #fff;paint-order:stroke fill}
+.box{position:absolute;left:90px;right:90px;top:1080px;background:#fff;border-radius:44px;padding:40px 46px;font-size:50px;font-weight:700;color:#2b1520;box-shadow:0 20px 60px rgba(194,24,91,.18)}
+.av{display:inline-block;width:70px;height:70px;border-radius:50%;background:#FF5C9A;vertical-align:middle;margin-right:20px}
+#arrow{position:absolute;left:0;right:0;text-align:center;font-size:200px;top:1450px}
+</style></head><body>
+<div class="ttl" id="a" style="top:330px;font-size:120px">¿QUÉ PRODUCTO ANALIZAMOS AHORA?</div>
+<div class="ttl" id="b" style="top:820px;font-size:80px;color:#2b1520;-webkit-text-stroke:0">déjalo en comentarios 💬</div>
+<div class="box" id="c"><span class="av"></span><span id="typ"></span><span id="cur">|</span></div>
+<div id="arrow">👇</div>
+<script>
+const $=id=>document.getElementById(id),cl=x=>x<0?0:x>1?1:x,back=x=>{x=cl(x);const c=1.7;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
+const txt='¡el sérum NAD+ de medicube! 🙏';
+window.render=t=>{$('a').style.transform=`scale(${Math.max(0,back(t/.4))})`;$('b').style.opacity=cl((t-.5)/.3);
+ $('c').style.opacity=cl((t-.9)/.2);$('c').style.transform=`translateY(${(1-cl((t-.9)/.3))*60}px)`;
+ $('typ').textContent=txt.slice(0,Math.max(0,Math.floor((t-1.1)*22)));$('cur').style.opacity=(Math.floor(t*3)%2)?1:0;
+ $('arrow').style.transform=`translateY(${Math.abs(Math.sin(t*5))*40}px)`;$('arrow').style.opacity=cl((t-1.5)/.3)};
+render(0);
+</script></body></html>

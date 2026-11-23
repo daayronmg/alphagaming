@@ -1,0 +1,45 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#111;font-family:'Inter',sans-serif;display:flex;flex-direction:column;gap:40px;padding:40px;align-items:center}
+.s{width:1080px;height:1920px;position:relative;overflow:hidden;color:#fff;background:#000}
+.ph{position:absolute;inset:0;background:url(assets/modelo.jpg) no-repeat}
+.big{font-family:'Inter Display','Inter';font-weight:900;line-height:1.02;letter-spacing:-2px;text-shadow:0 6px 30px rgba(0,0,0,.6)}
+.pill{display:inline-block;background:#fff;color:#000;font-weight:800;font-size:34px;padding:14px 30px;border-radius:60px;letter-spacing:1px}
+.hl{background:linear-gradient(transparent 60%,#7B5CFF 60%);padding:0 6px}
+.tag{position:absolute;background:rgba(255,255,255,.95);color:#000;font-weight:800;font-size:38px;padding:18px 30px;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.tag:before{content:'';position:absolute;width:22px;height:22px;background:#7B5CFF;border:5px solid #fff;border-radius:50%}
+.l:before{left:-40px;top:22px}.r:before{right:-40px;top:22px}
+.swipe{position:absolute;bottom:80px;left:0;right:0;text-align:center;font-weight:800;font-size:42px;letter-spacing:2px}
+</style></head><body>
+
+<div class="s" id="s1">
+  <div class="ph" style="background-size:auto 1920px;background-position:38% 0"></div>
+  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.2) 0%,rgba(0,0,0,0) 35%,rgba(0,0,0,.75) 70%,rgba(0,0,0,.9) 100%)"></div>
+  <div style="position:absolute;bottom:190px;left:70px;right:70px">
+    <div class="pill">1 PRENDA = LOOK DE FIESTA</div>
+    <div class="big" style="font-size:108px;margin-top:34px">El body de encaje que convierte unos <span class="hl">vaqueros</span> en outfit de noche</div>
+  </div>
+  <div class="swipe">DESLIZA &rarr;</div>
+</div>
+
+<div class="s" id="s2">
+  <div class="ph" style="background-size:auto 2600px;background-position:44% 30%;filter:brightness(.85)"></div>
+  <div style="position:absolute;top:120px;left:70px;right:70px"><div class="big" style="font-size:96px">Los detalles <span class="hl">que marcan</span></div></div>
+  <div class="tag r" style="top:620px;left:230px">Cuello alto</div>
+  <div class="tag l" style="top:820px;right:90px">Encaje floral transparente</div>
+  <div class="tag l" style="top:1000px;left:200px">Manga larga ajustada</div>
+  <div class="tag l" style="top:1420px;right:110px">Corte body: no se sube</div>
+</div>
+
+<div class="s" id="s3">
+  <div class="ph" style="background-size:auto 1920px;background-position:38% 0;filter:brightness(.5)"></div>
+  <div style="position:absolute;left:70px;right:70px;bottom:200px">
+    <div class="pill">CÓMO LLEVARLO</div>
+    <div style="font-size:54px;font-weight:700;line-height:1.5;margin-top:40px;text-shadow:0 4px 20px rgba(0,0,0,.8)">
+      + bralette negro<br>+ vaqueros anchos de tiro bajo<br>+ bolso negro de hombro
+    </div>
+    <div class="big" style="font-size:112px;margin-top:60px">Lo encuentras en la <span class="hl">cesta</span></div>
+    <div style="margin-top:50px"><span class="pill" style="font-size:44px;padding:22px 44px;background:#7B5CFF;color:#fff">TOCA LA CESTA NARANJA &darr;</span></div>
+  </div>
+</div>
+</body></html>
